@@ -19,6 +19,7 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QPushButton>
+#include <QQuickView>
 
 // time span in milliseconds which has to be between two
 // refreshes of the notifications
@@ -65,7 +66,7 @@ User::User(AccountStatePtr &account, const bool &isCurrent, QObject *parent)
     connect(this, &User::guiLog, Logger::instance(), &Logger::guiLog);
 
     connect(_account->account().data(), &Account::accountChangedAvatar, this, &User::avatarChanged);
-    connect(_account.data(), &AccountState::statusChanged, this, &User::statusChanged);
+    connect(_account->account().data(), &Account::userStatusChanged, this, [this] { emit statusChanged(); });
     connect(_account.data(), &AccountState::desktopNotificationsAllowedChanged, this, &User::desktopNotificationsAllowedChanged);
 
     connect(_activityModel, &ActivityListModel::sendNotificationRequest, this, &User::slotSendNotificationRequest);
@@ -236,10 +237,10 @@ void User::slotRefreshActivities()
     _activityModel->slotRefreshActivity();
 }
 
-void User::slotRefreshUserStatus() 
+void User::slotRefreshUserStatus()
 {
     if (_account.data() && _account.data()->isConnected()) {
-        _account.data()->fetchUserStatus();
+        _account->account()->userStatusJob()->fetchUserStatus();
     }
 }
 
@@ -621,29 +622,29 @@ QString User::server(bool shortened) const
     return serverUrl;
 }
 
-UserStatus::Status User::status() const
+UserStatus::OnlineStatus User::status() const
 {
-    return _account->status();
+    return _account->account()->userStatusJob()->userStatus().state();
 }
 
 QString User::statusMessage() const
 {
-    return _account->statusMessage();
+    return _account->account()->userStatusJob()->userStatus().message();
 }
 
 QUrl User::statusIcon() const
 {
-    return _account->statusIcon();
+    return _account->account()->userStatusJob()->userStatus().stateIcon();
 }
 
 QString User::statusEmoji() const
 {
-    return _account->statusEmoji();
+    return _account->account()->userStatusJob()->userStatus().icon();
 }
 
 bool User::serverHasUserStatus() const
 {
-    return _account->account()->capabilities().userStatus();
+    return _account->account()->capabilities().userStatusNotification();
 }
 
 QImage User::avatar() const

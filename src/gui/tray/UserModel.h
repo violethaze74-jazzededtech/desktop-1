@@ -7,6 +7,7 @@
 #include <QStringList>
 #include <QQuickImageProvider>
 #include <QHash>
+#include <QQuickView>
 
 #include "ActivityListModel.h"
 #include "accountmanager.h"
@@ -55,7 +56,7 @@ public:
     void removeAccount() const;
     QString avatarUrl() const;
     bool isDesktopNotificationsAllowed() const;
-    UserStatus::Status status() const;
+    UserStatus::OnlineStatus status() const;
     QString statusMessage() const;
     QUrl statusIcon() const;
     QString statusEmoji() const;

@@ -23,6 +23,7 @@
 #include <QBuffer>
 #include <QUrlQuery>
 #include <functional>
+#include <qjsondocument.h>
 
 class QUrl;
 class QJsonObject;
@@ -400,6 +401,18 @@ public:
         _usePOST = usePOST;
     }
 
+    void usePUT(bool usePUT = true)
+    {
+        _usePUT = usePUT;
+    }
+
+    void useDELETE(bool useDELETE = true)
+    {
+        _useDELETE = useDELETE;
+    }
+
+    void setBody(const QJsonDocument &body);
+
 public slots:
     void start() override;
 
@@ -429,10 +442,15 @@ signals:
     void allowDesktopNotificationsChanged(bool isAllowed);
 
 private:
+    QByteArray _body;
     QUrlQuery _additionalParams;
     QNetworkRequest _request;
 
     bool _usePOST = false;
+    bool _usePUT = false;
+    bool _useDELETE = false;
+
+    QByteArray verb() const;
 };
 
 /**

@@ -31,6 +31,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <qloggingcategory.h>
+#include <qnetworkrequest.h>
 #ifndef TOKEN_AUTH_ONLY
 #include <QPainter>
 #include <QPainterPath>
@@ -830,13 +831,50 @@ void JsonApiJob::addRawHeader(const QByteArray &headerName, const QByteArray &va
    _request.setRawHeader(headerName, value);
 }
 
+void JsonApiJob::setBody(const QJsonDocument &body)
+{
+    _body = body.toJson();
+    qCDebug(lcJsonApiJob) << "Set body for request:" << _body;
+    if (!_body.isEmpty()) {
+        _request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    }
+}
+
+QByteArray JsonApiJob::verb() const
+{
+    if (_useDELETE) {
+        Q_ASSERT(!_usePUT);
+        Q_ASSERT(!_usePOST);
+        return "DELETE";
+    }
+
+    if (_usePUT) {
+        Q_ASSERT(!_usePOST);
+        Q_ASSERT(!_useDELETE);
+        return "PUT";
+    }
+
+    if (_usePOST) {
+        Q_ASSERT(!_usePUT);
+        Q_ASSERT(!_useDELETE);
+        return "POST";
+    }
+
+    return "GET";
+}
+
 void JsonApiJob::start()
 {
     addRawHeader("OCS-APIREQUEST", "true");
     auto query = _additionalParams;
     query.addQueryItem(QLatin1String("format"), QLatin1String("json"));
     QUrl url = Utility::concatUrlPath(account()->url(), path(), query);
-    sendRequest(_usePOST ? "POST" : "GET", url, _request);
+    const auto httpVerb = verb();
+    if (!_body.isEmpty()) {
+        sendRequest(httpVerb, url, _request, _body);
+    } else {
+        sendRequest(httpVerb, url, _request);
+    }
     AbstractNetworkJob::start();
 }
 
