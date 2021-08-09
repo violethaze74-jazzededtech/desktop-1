@@ -14,6 +14,7 @@
 #include "folderman.h"
 #include "NotificationCache.h"
 #include <chrono>
+#include <qquickview.h>
 
 namespace OCC {
 
@@ -158,6 +159,7 @@ public:
     Q_INVOKABLE void login(const int &id);
     Q_INVOKABLE void logout(const int &id);
     Q_INVOKABLE void removeAccount(const int &id);
+    Q_INVOKABLE void showSetUserStatusDialog(const int &id);
 
     ActivityListModel *currentActivityModel();
 

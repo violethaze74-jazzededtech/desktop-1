@@ -21,7 +21,6 @@
 #include "logger.h"
 #include "configfile.h"
 #include "ocsnavigationappsjob.h"
-#include "jsonuserstatusjob.h"
 
 #include <QSettings>
 #include <QTimer>

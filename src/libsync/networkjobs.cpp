@@ -31,7 +31,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <qloggingcategory.h>
-#include <qnetworkrequest.h>
 #ifndef TOKEN_AUTH_ONLY
 #include <QPainter>
 #include <QPainterPath>

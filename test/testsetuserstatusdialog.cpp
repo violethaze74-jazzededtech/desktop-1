@@ -12,18 +12,16 @@
  * for more details.
  */
 
-#include "userstatus.h"
-#include "userstatusjob.h"
-#include "userstatusdialogmodel.h"
+#include "userstatusconnector.h"
+#include "setuserstatusdialogmodel.h"
 
 #include <QTest>
 #include <QSignalSpy>
+#include <QDateTime>
 
 #include <memory>
-#include <qdatetime.h>
-#include <qsignalspy.h>
 
-class FakeUserStatusJob : public OCC::UserStatusJob
+class FakeUserStatusConnector : public OCC::UserStatusConnector
 {
 public:
     void fetchUserStatus() override
@@ -58,7 +56,7 @@ public:
         }
 
         _userStatusSet = userStatus;
-        emit UserStatusJob::userStatusSet();
+        emit UserStatusConnector::userStatusSet();
     }
 
     void clearMessage() override
@@ -210,12 +208,12 @@ private slots:
 
         const auto fakePredefinedStatuses = createFakePredefinedStatuses(createDateTime());
 
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
         fakeDateTimeProvider->setCurrentDateTime(currentDateTime);
         fakeUserStatusJob->setFakeUserStatus(userStatus);
         fakeUserStatusJob->setFakePredefinedStatuses(fakePredefinedStatuses);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob, std::move(fakeDateTimeProvider));
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob, std::move(fakeDateTimeProvider));
 
         // Was user status set correctly?
         QCOMPARE(model.userStatusMessage(), userStatusMessage);
@@ -241,7 +239,7 @@ private slots:
 
     void testCtor_noStatusSet_showSensibleDefaults()
     {
-        OCC::UserStatusDialogModel model(nullptr, nullptr);
+        OCC::SetUserStatusDialogModel model(nullptr, nullptr);
 
         QCOMPARE(model.userStatusMessage(), "");
         QCOMPARE(model.userStatusEmoji(), "😀");
@@ -250,10 +248,10 @@ private slots:
 
     void testCtor_fetchStatusButNoStatusSet_showSensibleDefaults()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setFakeUserStatus({ "", "", "",
             OCC::UserStatus::OnlineStatus::Offline, false, {} });
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.onlineStatus(), OCC::UserStatus::OnlineStatus::Online);
         QCOMPARE(model.userStatusMessage(), "");
@@ -264,10 +262,10 @@ private slots:
     void testSetOnlineStatus_emitOnlineStatusChanged()
     {
         const OCC::UserStatus::OnlineStatus onlineStatus(OCC::UserStatus::OnlineStatus::Invisible);
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         QSignalSpy onlineStatusChangedSpy(&model,
-            &OCC::UserStatusDialogModel::onlineStatusChanged);
+            &OCC::SetUserStatusDialogModel::onlineStatusChanged);
 
         model.setOnlineStatus(onlineStatus);
 
@@ -276,9 +274,9 @@ private slots:
 
     void testSetUserStatus_setCustomMessage_userStatusSetCorrect()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy finishedSpy(&model, &OCC::UserStatusDialogModel::finished);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy finishedSpy(&model, &OCC::SetUserStatusDialogModel::finished);
 
         const QString userStatusMessage("Some status");
         const QString userStatusIcon("❤");
@@ -305,11 +303,11 @@ private slots:
 
     void testSetUserStatusMessage_predefinedStatusWasSet_userStatusSetCorrect()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setFakePredefinedStatuses(createFakePredefinedStatuses(createDateTime()));
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         model.setPredefinedStatus(0);
-        QSignalSpy finishedSpy(&model, &OCC::UserStatusDialogModel::finished);
+        QSignalSpy finishedSpy(&model, &OCC::SetUserStatusDialogModel::finished);
 
         const QString userStatusMessage("Some status");
         const OCC::UserStatus::OnlineStatus userStatusState(OCC::UserStatus::OnlineStatus::Online);
@@ -333,11 +331,11 @@ private slots:
 
     void testSetUserStatusEmoji_predefinedStatusWasSet_userStatusSetCorrect()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setFakePredefinedStatuses(createFakePredefinedStatuses(createDateTime()));
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         model.setPredefinedStatus(0);
-        QSignalSpy finishedSpy(&model, &OCC::UserStatusDialogModel::finished);
+        QSignalSpy finishedSpy(&model, &OCC::SetUserStatusDialogModel::finished);
 
         const QString userStatusIcon("❤");
         const OCC::UserStatus::OnlineStatus userStatusState(OCC::UserStatus::OnlineStatus::Online);
@@ -361,19 +359,19 @@ private slots:
 
     void testSetPredefinedStatus_emitUserStatusChangedAndSetUserStatus()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
         const auto currentTime = createDateTime();
         fakeDateTimeProvider->setCurrentDateTime(currentTime);
         const auto fakePredefinedStatuses = createFakePredefinedStatuses(currentTime);
         fakeUserStatusJob->setFakePredefinedStatuses(fakePredefinedStatuses);
-        OCC::UserStatusDialogModel model(std::move(fakeUserStatusJob),
+        OCC::SetUserStatusDialogModel model(std::move(fakeUserStatusJob),
             std::move(fakeDateTimeProvider));
 
         QSignalSpy userStatusChangedSpy(&model,
-            &OCC::UserStatusDialogModel::userStatusChanged);
+            &OCC::SetUserStatusDialogModel::userStatusChanged);
         QSignalSpy clearAtChangedSpy(&model,
-            &OCC::UserStatusDialogModel::clearAtChanged);
+            &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto fakePredefinedUserStatusIndex = 0;
         model.setPredefinedStatus(fakePredefinedUserStatusIndex);
@@ -391,9 +389,9 @@ private slots:
 
     void testSetClear_setClearAtStage0_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 0;
         model.setClearAt(clearAtIndex);
@@ -404,9 +402,9 @@ private slots:
 
     void testSetClear_setClearAtStage1_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 1;
         model.setClearAt(clearAtIndex);
@@ -417,9 +415,9 @@ private slots:
 
     void testSetClear_setClearAtStage2_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 2;
         model.setClearAt(clearAtIndex);
@@ -430,9 +428,9 @@ private slots:
 
     void testSetClear_setClearAtStage3_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 3;
         model.setClearAt(clearAtIndex);
@@ -443,9 +441,9 @@ private slots:
 
     void testSetClear_setClearAtStage4_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 4;
         model.setClearAt(clearAtIndex);
@@ -456,9 +454,9 @@ private slots:
 
     void testSetClear_setClearAtStage5_emitClearAtChangedAndClearAtSet()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
-        QSignalSpy clearAtChangedSpy(&model, &OCC::UserStatusDialogModel::clearAtChanged);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+        QSignalSpy clearAtChangedSpy(&model, &OCC::SetUserStatusDialogModel::clearAtChanged);
 
         const auto clearAtIndex = 5;
         model.setClearAt(clearAtIndex);
@@ -469,8 +467,8 @@ private slots:
 
     void testClearAtStages()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.clearAt(), tr("Don't clear"));
         const auto clearAtStages = model.clearAtStages();
@@ -497,7 +495,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("Less than a minute"));
         }
@@ -512,7 +510,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("1 minute"));
         }
@@ -527,7 +525,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("30 minutes"));
         }
@@ -542,7 +540,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("1 hour"));
         }
@@ -557,7 +555,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("4 hours"));
         }
@@ -572,7 +570,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("1 day"));
         }
@@ -587,7 +585,7 @@ private slots:
             auto fakeDateTimeProvider = std::make_unique<FakeDateTimeProvider>();
             fakeDateTimeProvider->setCurrentDateTime(currentTime);
 
-            OCC::UserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
+            OCC::SetUserStatusDialogModel model(userStatus, std::move(fakeDateTimeProvider));
 
             QCOMPARE(model.clearAt(), tr("7 days"));
         }
@@ -602,7 +600,7 @@ private slots:
             clearAt._endof = "day";
             userStatus.setClearAt(clearAt);
 
-            OCC::UserStatusDialogModel model(userStatus);
+            OCC::SetUserStatusDialogModel model(userStatus);
 
             QCOMPARE(model.clearAt(), tr("Today"));
         }
@@ -614,7 +612,7 @@ private slots:
             clearAt._endof = "week";
             userStatus.setClearAt(clearAt);
 
-            OCC::UserStatusDialogModel model(userStatus);
+            OCC::SetUserStatusDialogModel model(userStatus);
 
             QCOMPARE(model.clearAt(), tr("This week"));
         }
@@ -629,7 +627,7 @@ private slots:
             clearAt._period = 60 * 30;
             userStatus.setClearAt(clearAt);
 
-            OCC::UserStatusDialogModel model(userStatus);
+            OCC::SetUserStatusDialogModel model(userStatus);
 
             QCOMPARE(model.clearAt(), tr("30 minutes"));
         }
@@ -641,7 +639,7 @@ private slots:
             clearAt._period = 60 * 60;
             userStatus.setClearAt(clearAt);
 
-            OCC::UserStatusDialogModel model(userStatus);
+            OCC::SetUserStatusDialogModel model(userStatus);
 
             QCOMPARE(model.clearAt(), tr("1 hour"));
         }
@@ -649,8 +647,8 @@ private slots:
 
     void testClearUserStatus()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         model.clearUserStatus();
 
@@ -659,9 +657,9 @@ private slots:
 
     void testError_couldNotFetchPredefinedStatuses_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorCouldNotFetchPredefinedUserStatuses(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.errorMessage(),
             tr("Could not fetch predefined statuses. Make sure you are connected to the internet."));
@@ -669,9 +667,9 @@ private slots:
 
     void testError_couldNotFetchUserStatus_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorCouldNotFetchUserStatus(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.errorMessage(),
             tr("Could not fetch user status. Make sure you are connected to the internet."));
@@ -679,9 +677,9 @@ private slots:
 
     void testError_userStatusNotSupported_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorUserStatusNotSupported(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.errorMessage(),
             tr("User status feature is not supported on the server."));
@@ -689,9 +687,9 @@ private slots:
 
     void testError_couldSetUserStatus_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorCouldNotSetUserStatusMessage(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         model.setUserStatus();
 
         QCOMPARE(model.errorMessage(),
@@ -700,9 +698,9 @@ private slots:
 
     void testError_emojisNotSupported_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorEmojisNotSupported(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         model.setUserStatus();
 
         QCOMPARE(model.errorMessage(),
@@ -711,9 +709,9 @@ private slots:
 
     void testError_couldNotClearMessage_emitError()
     {
-        auto fakeUserStatusJob = std::make_shared<FakeUserStatusJob>();
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorCouldNotClearUserStatusMessage(true);
-        OCC::UserStatusDialogModel model(fakeUserStatusJob);
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
         model.clearUserStatus();
 
         QCOMPARE(model.errorMessage(),

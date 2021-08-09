@@ -15,7 +15,7 @@
 #pragma once
 
 #include "accountfwd.h"
-#include "userstatusjob.h"
+#include "userstatusconnector.h"
 
 #include <QPointer>
 
@@ -24,10 +24,10 @@ namespace OCC {
 class JsonApiJob;
 class SimpleNetworkJob;
 
-class OWNCLOUDSYNC_EXPORT JsonUserStatusJob : public UserStatusJob
+class OWNCLOUDSYNC_EXPORT OcsUserStatusConnector : public UserStatusConnector
 {
 public:
-    explicit JsonUserStatusJob(AccountPtr account, QObject *parent = nullptr);
+    explicit OcsUserStatusConnector(AccountPtr account, QObject *parent = nullptr);
 
     void fetchUserStatus() override;
 

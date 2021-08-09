@@ -70,11 +70,11 @@ public:
     UserStatus(const QString &id, const QString &message, const QString &icon,
         OnlineStatus state, bool messagePredefined, const Optional<ClearAt> &clearAt = {});
 
-    QString id() const;
-    QString message() const;
-    QString icon() const;
-    OnlineStatus state() const;
-    Optional<ClearAt> clearAt() const;
+    Q_REQUIRED_RESULT QString id() const;
+    Q_REQUIRED_RESULT QString message() const;
+    Q_REQUIRED_RESULT QString icon() const;
+    Q_REQUIRED_RESULT OnlineStatus state() const;
+    Q_REQUIRED_RESULT Optional<ClearAt> clearAt() const;
 
     void setId(const QString &id);
     void setMessage(const QString &message);
@@ -83,9 +83,9 @@ public:
     void setMessagePredefined(bool value);
     void setClearAt(const Optional<ClearAt> &dateTime);
 
-    bool messagePredefined() const;
+    Q_REQUIRED_RESULT bool messagePredefined() const;
 
-    QUrl stateIcon() const;
+    Q_REQUIRED_RESULT QUrl stateIcon() const;
 
 private:
     QString _id;
@@ -96,7 +96,7 @@ private:
     Optional<ClearAt> _clearAt;
 };
 
-class OWNCLOUDSYNC_EXPORT UserStatusJob : public QObject
+class OWNCLOUDSYNC_EXPORT UserStatusConnector : public QObject
 {
     Q_OBJECT
 
@@ -109,10 +109,11 @@ public:
         CouldNotSetUserStatus,
         CouldNotClearMessage
     };
+    Q_ENUM(Error)
 
-    explicit UserStatusJob(QObject *parent = nullptr);
+    explicit UserStatusConnector(QObject *parent = nullptr);
 
-    virtual ~UserStatusJob();
+    virtual ~UserStatusConnector();
 
     virtual void fetchUserStatus() = 0;
 

@@ -58,6 +58,7 @@ nextcloud_add_test(Capabilities)
 nextcloud_add_test(PushNotifications)
 nextcloud_add_test(Theme)
 nextcloud_add_test(NotificationCache)
+nextcloud_add_test(SetUserStatusDialog)
 
 if( UNIX AND NOT APPLE )
     nextcloud_add_test(InotifyWatcher)

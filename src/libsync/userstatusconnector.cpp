@@ -12,7 +12,7 @@
  * for more details.
  */
 
-#include "userstatusjob.h"
+#include "userstatusconnector.h"
 #include "theme.h"
 
 namespace OCC {
@@ -112,10 +112,10 @@ void UserStatus::setClearAt(const Optional<ClearAt> &dateTime)
 }
 
 
-UserStatusJob::UserStatusJob(QObject *parent)
+UserStatusConnector::UserStatusConnector(QObject *parent)
     : QObject(parent)
 {
 }
 
-UserStatusJob::~UserStatusJob() = default;
+UserStatusConnector::~UserStatusConnector() = default;
 }

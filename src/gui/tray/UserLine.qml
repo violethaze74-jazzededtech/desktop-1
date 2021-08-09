@@ -189,6 +189,29 @@ MenuItem {
                 }
 
                 MenuItem {
+                    id: setUserStatus
+                    
+                    text: qsTr("Set status")
+                    font.pixelSize: Style.topLinePixelSize
+                    hoverEnabled: true
+                    onClicked: {
+                        UserModel.showSetUserStatusDialog(index)
+                        accountMenu.close()
+                    }
+
+                    background: Item {
+                        height: parent.height
+                        width: parent.menu.width
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 1
+                            color: parent.parent.hovered ? Style.lightHover : "transparent"
+                        }
+                    }
+                    
+                }
+
+                MenuItem {
                     text: model.isConnected ? qsTr("Log out") : qsTr("Log in")
                     font.pixelSize: Style.topLinePixelSize
                     hoverEnabled: true

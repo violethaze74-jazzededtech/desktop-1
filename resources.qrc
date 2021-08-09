@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/qml">
+        <file>src/gui/SetUserStatusView.qml</file>
         <file>src/gui/EmojiPicker.qml</file>
         <file>src/gui/tray/Window.qml</file>
         <file>src/gui/tray/UserLine.qml</file>

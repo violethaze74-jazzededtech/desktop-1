@@ -21,7 +21,8 @@
 #include <QPointer>
 #include "connectionvalidator.h"
 #include "creds/abstractcredentials.h"
-#include "userstatusjob.h"
+#include "ocsuserstatusconnector.h"
+
 #include <memory>
 
 class QSettings;

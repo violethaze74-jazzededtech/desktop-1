@@ -56,8 +56,8 @@ set(libsync_SRCS
     clientsideencryption.cpp
     clientsideencryptionjobs.cpp
     datetimeprovider.cpp
-    jsonuserstatusjob.cpp
-    userstatusjob.cpp
+    ocsuserstatusconnector.cpp
+    userstatusconnector.cpp
     creds/dummycredentials.cpp
     creds/abstractcredentials.cpp
     creds/credentialscommon.cpp

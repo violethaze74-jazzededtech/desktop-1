@@ -26,6 +26,8 @@
 #include "theme.h"
 #include "common/utility.h"
 #include "cocoainitializer.h"
+#include "setuserstatusdialogmodel.h"
+#include "setuserstatusdialog.h"
 #include "emojimodel.h"
 
 #if defined(BUILD_UPDATER)
@@ -73,6 +75,11 @@ int main(int argc, char **argv)
 
     qmlRegisterType<EmojiModel>("com.nextcloud.desktopclient", 1, 0, "EmojiModel");
     qRegisterMetaTypeStreamOperators<Emoji>();
+    qmlRegisterType<SetUserStatusDialogModel>("com.nextcloud.desktopclient", 1, 0,
+        "SetUserStatusDialogModel");
+    qmlRegisterUncreatableType<OCC::UserStatus>("com.nextcloud.desktopclient", 1, 0, "UserStatus",
+        "Access to Status enum");
+    qRegisterMetaType<OCC::UserStatus>("UserStatus");
 
 #ifdef Q_OS_WIN
     // The Windows style still has pixelated elements with Qt 5.6,
