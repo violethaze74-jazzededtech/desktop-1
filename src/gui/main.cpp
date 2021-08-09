@@ -26,6 +26,7 @@
 #include "theme.h"
 #include "common/utility.h"
 #include "cocoainitializer.h"
+#include "emojimodel.h"
 
 #if defined(BUILD_UPDATER)
 #include "updater/updater.h"
@@ -69,6 +70,9 @@ int main(int argc, char **argv)
     Mac::CocoaInitializer cocoaInit; // RIIA
 #endif
     OCC::Application app(argc, argv);
+
+    qmlRegisterType<EmojiModel>("com.nextcloud.desktopclient", 1, 0, "EmojiModel");
+    qRegisterMetaTypeStreamOperators<Emoji>();
 
 #ifdef Q_OS_WIN
     // The Windows style still has pixelated elements with Qt 5.6,
