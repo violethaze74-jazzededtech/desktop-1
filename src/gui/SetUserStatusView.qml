@@ -193,28 +193,11 @@ ColumnLayout {
         }
     }
 
-    Item {
-        id: box
+    ErrorBox {
         Layout.margins: 8
         Layout.fillWidth: true
-        implicitHeight: errorMessage.implicitHeight + 2 * 8
+        
         visible: setUserStatusDialogModel.errorMessage != ""
-
-        Rectangle {
-            anchors.fill: parent
-            color: "red"
-            border.color: "black"
-        }
-
-        Text {
-            anchors.fill: parent
-            anchors.margins: 8
-            width: parent.width
-            
-            id: errorMessage
-            text: "<b>Error:</b> " + setUserStatusDialogModel.errorMessage
-            color: "white"
-            wrapMode: Text.WordWrap
-        }
+        text: "<b>Error:</b> " + setUserStatusDialogModel.errorMessage
     }
 }
