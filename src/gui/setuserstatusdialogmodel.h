@@ -92,7 +92,6 @@ public:
     Q_REQUIRED_RESULT QString errorMessage() const;
 
 signals:
-    void showError();
     void errorMessageChanged();
     void userStatusChanged();
     void onlineStatusChanged();
@@ -122,6 +121,7 @@ private:
     Q_REQUIRED_RESULT QString timeDifferenceToString(int differenceSecs) const;
     Q_REQUIRED_RESULT Optional<ClearAt> clearStageTypeToDateTime(ClearStageType type) const;
     void setError(const QString &reason);
+    void clearError();
 
     std::shared_ptr<UserStatusConnector> _userStatusJob {};
     std::vector<UserStatus> _predefinedStatuses;

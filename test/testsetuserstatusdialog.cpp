@@ -672,7 +672,7 @@ private slots:
         OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.errorMessage(),
-            tr("Could not fetch user status. Make sure you are connected to the internet."));
+            tr("Could not fetch predefined statuses. Make sure you are connected to the server."));
     }
 
     void testError_userStatusNotSupported_emitError()
@@ -682,7 +682,7 @@ private slots:
         OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
 
         QCOMPARE(model.errorMessage(),
-            tr("User status feature is not supported on the server."));
+            tr("User status feature is not supported. You will not be able to set your user status."));
     }
 
     void testError_couldSetUserStatus_emitError()
@@ -693,7 +693,7 @@ private slots:
         model.setUserStatus();
 
         QCOMPARE(model.errorMessage(),
-            tr("Could not set user status. Make sure you are connected to the internet."));
+            tr("Could not set user status. Make sure you are connected to the server."));
     }
 
     void testError_emojisNotSupported_emitError()
@@ -701,10 +701,9 @@ private slots:
         auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
         fakeUserStatusJob->setErrorEmojisNotSupported(true);
         OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
-        model.setUserStatus();
 
         QCOMPARE(model.errorMessage(),
-            tr("Emojis feature is not supported on the server."));
+            tr("Emojis feature is not supported. Some user status functionality may not work."));
     }
 
     void testError_couldNotClearMessage_emitError()
@@ -715,7 +714,33 @@ private slots:
         model.clearUserStatus();
 
         QCOMPARE(model.errorMessage(),
-            tr("Could not clear user status message. Make sure you are connected to the internet."));
+            tr("Could not clear user status message. Make sure you are connected to the server."));
+    }
+
+    void testError_setUserStatus_clearErrorMessage()
+    {
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+
+        fakeUserStatusJob->setErrorCouldNotSetUserStatusMessage(true);
+        model.setUserStatus();
+        QVERIFY(!model.errorMessage().isEmpty());
+        fakeUserStatusJob->setErrorCouldNotSetUserStatusMessage(false);
+        model.setUserStatus();
+        QVERIFY(model.errorMessage().isEmpty());
+    }
+
+    void testError_clearUserStatus_clearErrorMessage()
+    {
+        auto fakeUserStatusJob = std::make_shared<FakeUserStatusConnector>();
+        OCC::SetUserStatusDialogModel model(fakeUserStatusJob);
+
+        fakeUserStatusJob->setErrorCouldNotSetUserStatusMessage(true);
+        model.setUserStatus();
+        QVERIFY(!model.errorMessage().isEmpty());
+        fakeUserStatusJob->setErrorCouldNotSetUserStatusMessage(false);
+        model.clearUserStatus();
+        QVERIFY(model.errorMessage().isEmpty());
     }
 };
 

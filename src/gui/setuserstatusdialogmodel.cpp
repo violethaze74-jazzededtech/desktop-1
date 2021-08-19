@@ -114,27 +114,27 @@ void SetUserStatusDialogModel::onError(UserStatusConnector::Error error)
 
     switch (error) {
     case UserStatusConnector::Error::CouldNotFetchPredefinedUserStatuses:
-        setError(tr("Could not fetch predefined statuses. Make sure you are connected to the internet."));
+        setError(tr("Could not fetch predefined statuses. Make sure you are connected to the server."));
         return;
 
     case UserStatusConnector::Error::CouldNotFetchUserStatus:
-        setError(tr("Could not fetch user status. Make sure you are connected to the internet."));
+        setError(tr("Could not fetch user status. Make sure you are connected to the server."));
         return;
 
     case UserStatusConnector::Error::UserStatusNotSupported:
-        setError(tr("User status feature is not supported on the server."));
+        setError(tr("User status feature is not supported. You will not be able to set your user status."));
         return;
 
     case UserStatusConnector::Error::EmojisNotSupported:
-        setError(tr("Emojis feature is not supported on the server."));
+        setError(tr("Emojis feature is not supported. Some user status functionality may not work."));
         return;
 
     case UserStatusConnector::Error::CouldNotSetUserStatus:
-        setError(tr("Could not set user status. Make sure you are connected to the internet."));
+        setError(tr("Could not set user status. Make sure you are connected to the server."));
         return;
 
     case UserStatusConnector::Error::CouldNotClearMessage:
-        setError(tr("Could not clear user status message. Make sure you are connected to the internet."));
+        setError(tr("Could not clear user status message. Make sure you are connected to the server."));
         return;
     }
 
@@ -145,7 +145,11 @@ void SetUserStatusDialogModel::setError(const QString &reason)
 {
     _errorMessage = reason;
     emit errorMessageChanged();
-    emit showError();
+}
+
+void SetUserStatusDialogModel::clearError()
+{
+    setError("");
 }
 
 void SetUserStatusDialogModel::setOnlineStatus(UserStatus::OnlineStatus status)
@@ -271,11 +275,13 @@ Optional<ClearAt> SetUserStatusDialogModel::clearStageTypeToDateTime(ClearStageT
 
 void SetUserStatusDialogModel::setUserStatus()
 {
+    clearError();
     _userStatusJob->setUserStatus(_userStatus);
 }
 
 void SetUserStatusDialogModel::clearUserStatus()
 {
+    clearError();
     _userStatusJob->clearMessage();
 }
 

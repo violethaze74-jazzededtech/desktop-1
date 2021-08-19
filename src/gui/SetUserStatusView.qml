@@ -24,13 +24,6 @@ ColumnLayout {
     spacing: 0
     property NC.SetUserStatusDialogModel setUserStatusDialogModel
 
-    Connections {
-        target: setUserStatusDialogModel
-        function onShowError() {
-            errorDialog.open()
-        }
-    }
-
     FontMetrics {
         id: metrics
     }
@@ -200,11 +193,28 @@ ColumnLayout {
         }
     }
 
-    MessageDialog {
-        id: errorDialog
-        icon: StandardIcon.Critical
-        title: qsTr("Set user status")
-        text: setUserStatusDialogModel.errorMessage
-        visible: false
+    Item {
+        id: box
+        Layout.margins: 8
+        Layout.fillWidth: true
+        implicitHeight: errorMessage.implicitHeight + 2 * 8
+        visible: setUserStatusDialogModel.errorMessage != ""
+
+        Rectangle {
+            anchors.fill: parent
+            color: "red"
+            border.color: "black"
+        }
+
+        Text {
+            anchors.fill: parent
+            anchors.margins: 8
+            width: parent.width
+            
+            id: errorMessage
+            text: "<b>Error:</b> " + setUserStatusDialogModel.errorMessage
+            color: "white"
+            wrapMode: Text.WordWrap
+        }
     }
 }
