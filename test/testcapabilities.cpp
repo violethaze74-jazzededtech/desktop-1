@@ -9,6 +9,7 @@ class TestCapabilities : public QObject
 private slots:
     void testPushNotificationsAvailable_pushNotificationsForActivitiesAvailable_returnTrue()
     {
+
         QStringList typeList;
         typeList.append("activities");
 

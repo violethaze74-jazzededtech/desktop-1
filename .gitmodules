@@ -1,3 +1,8 @@
 [submodule "src/3rdparty/libcrashreporter-qt"]
 	path = src/3rdparty/libcrashreporter-qt
 	url = git://github.com/dschmidt/libcrashreporter-qt.git
+[submodule "src/3rdparty/qthttpserver/qthttpserver"]
+	path = src/3rdparty/qthttpserver/qthttpserver
+	url = https://github.com/qt-labs/qthttpserver.git
+	shallow = true
+	fetchRecurseSubmodules = true

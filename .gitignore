@@ -187,3 +187,9 @@ convert.exe
 *-sidebar.png
 *-w10startmenu.png
 theme.qrc
+
+src/3rdparty/qthttpserver/include
+src/3rdparty/qthttpserver/*_autogen
+src/3rdparty/qthttpserver/*.exp*
+src/3rdparty/qthttpserver/*.cmake*
+src/3rdparty/qthttpserver/*.lib*
