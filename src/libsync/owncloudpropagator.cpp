@@ -21,6 +21,7 @@
 #include "propagateremotedelete.h"
 #include "propagateremotemove.h"
 #include "propagateremotemkdir.h"
+#include "bulkpropagatorjob.h"
 #include "propagatorjobs.h"
 #include "filesystem.h"
 #include "common/utility.h"
@@ -1304,13 +1305,4 @@ QString OwncloudPropagator::remotePath() const
     return _remoteFolder;
 }
 
-BulkPropagatorJob::BulkPropagatorJob(OwncloudPropagator *propagator, const QVector<SyncFileItemPtr> &items)
-    : PropagatorCompositeJob(propagator)
-    , _items(items)
-{
-    for(const auto &oneItemJob : _items) {
-        appendTask(oneItemJob);
-    }
-    _items.clear();
-}
 }

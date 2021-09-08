@@ -380,19 +380,6 @@ private:
     bool scheduleDelayedJobs();
 };
 
-class BulkPropagatorJob : public PropagatorCompositeJob
-{
-    Q_OBJECT
-public:
-
-    explicit BulkPropagatorJob(OwncloudPropagator *propagator,
-                               const QVector<SyncFileItemPtr> &items);
-
-private:
-
-    QVector<SyncFileItemPtr> _items;
-};
-
 /**
  * @brief Dummy job that just mark it as completed and ignored
  * @ingroup libsync
