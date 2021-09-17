@@ -862,7 +862,7 @@ Result<Vfs::ConvertToPlaceholderResult, QString> OwncloudPropagator::staticUpdat
 
 bool OwncloudPropagator::isDelayedUploadItem(const SyncFileItemPtr &item) const
 {
-    return !_scheduleDelayedTasks && !item->_isEncrypted;
+    return !_scheduleDelayedTasks && !item->_isEncrypted && _syncOptions._minChunkSize > item->_size;
 }
 
 void OwncloudPropagator::setScheduleDelayedTasks(bool active)
