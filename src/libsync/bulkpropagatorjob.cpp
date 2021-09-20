@@ -64,8 +64,6 @@ BulkPropagatorJob::BulkPropagatorJob(OwncloudPropagator *propagator,
 bool BulkPropagatorJob::scheduleSelfOrChild()
 {
     if (_items.empty()) {
-        qCInfo(lcBulkPropagatorJob) << "final status" << _finalStatus;
-        emit finished(_finalStatus);
         return false;
     }
 
@@ -109,8 +107,6 @@ void BulkPropagatorJob::startUploadFile(SyncFileItemPtr item, UploadFileInfo fil
         done(item, SyncFileItem::DetailError, tr("Upload of %1 exceeds the quota for the folder").arg(Utility::octetsToString(fileToUpload._size)));
         return;
     }
-
-    //propagator()->_activeJobList.append(this);
 
     qCDebug(lcBulkPropagatorJob) << "Running the compute checksum";
     return slotComputeContentChecksum(item, fileToUpload);
@@ -176,7 +172,6 @@ void BulkPropagatorJob::doStartUpload(SyncFileItemPtr item,
     connect(job, &QObject::destroyed, this, &BulkPropagatorJob::slotJobDestroyed);
     adjustLastJobTimeout(job, fileSize);
     job->start();
-    //propagator()->_activeJobList.append(this);
 }
 
 void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
@@ -261,10 +256,6 @@ void BulkPropagatorJob::slotStartUpload(SyncFileItemPtr item,
 {
     QByteArray transmissionChecksumHeader;
 
-    // Remove ourselfs from the list of active job, before any posible call to done()
-    // When we start chunks, we will add it again, once for every chunks.
-    //propagator()->_activeJobList.removeOne(this);
-
     transmissionChecksumHeader = makeChecksumHeader(transmissionChecksumType, transmissionChecksum);
 
     // If no checksum header was not set, reuse the transmission checksum as the content checksum.
@@ -339,7 +330,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
             return;
         }
         finished = true;
-        //startPollJob(path);
+        startPollJob(item, fileToUpload, path);
         return;
     }
 
@@ -406,6 +397,7 @@ void BulkPropagatorJob::slotUploadProgress(qint64, qint64)
 void BulkPropagatorJob::slotJobDestroyed(QObject *job)
 {
     qCInfo(lcBulkPropagatorJob()) << "slotJobDestroyed";
+    _jobs.erase(std::remove(_jobs.begin(), _jobs.end(), job), _jobs.end());
 }
 
 void BulkPropagatorJob::adjustLastJobTimeout(AbstractNetworkJob *job, qint64 fileSize)
@@ -425,8 +417,9 @@ void BulkPropagatorJob::finalize(SyncFileItemPtr item,
 {
     // Update the quota, if known
     auto quotaIt = propagator()->_folderQuota.find(QFileInfo(item->_file).path());
-    if (quotaIt != propagator()->_folderQuota.end())
+    if (quotaIt != propagator()->_folderQuota.end()) {
         quotaIt.value() -= fileToUpload._size;
+    }
 
     // Update the database entry
     const auto result = propagator()->updateMetadata(*item);
@@ -466,6 +459,67 @@ void BulkPropagatorJob::done(SyncFileItemPtr item,
     item->_errorString = errorString;
 
     qCInfo(lcBulkPropagatorJob) << "Item completed" << item->destination() << item->_status << item->_instruction << item->_errorString;
+
+    if (item->_isRestoration) {
+        if (item->_status == SyncFileItem::Success
+            || item->_status == SyncFileItem::Conflict) {
+            item->_status = SyncFileItem::Restoration;
+        } else {
+            item->_errorString += tr("; Restoration Failed: %1").arg(errorString);
+        }
+    } else {
+        if (item->_errorString.isEmpty()) {
+            item->_errorString = errorString;
+        }
+    }
+
+    if (propagator()->_abortRequested && (item->_status == SyncFileItem::NormalError
+                                          || item->_status == SyncFileItem::FatalError)) {
+        // an abort request is ongoing. Change the status to Soft-Error
+        item->_status = SyncFileItem::SoftError;
+    }
+
+    // Blacklist handling
+    switch (item->_status) {
+    case SyncFileItem::SoftError:
+    case SyncFileItem::FatalError:
+    case SyncFileItem::NormalError:
+    case SyncFileItem::DetailError:
+        // Check the blacklist, possibly adjusting the item (including its status)
+        blacklistUpdate(propagator()->_journal, *item);
+        break;
+    case SyncFileItem::Success:
+    case SyncFileItem::Restoration:
+        if (item->_hasBlacklistEntry) {
+            // wipe blacklist entry.
+            propagator()->_journal->wipeErrorBlacklistEntry(item->_file);
+            // remove a blacklist entry in case the file was moved.
+            if (item->_originalFile != item->_file) {
+                propagator()->_journal->wipeErrorBlacklistEntry(item->_originalFile);
+            }
+        }
+        break;
+    case SyncFileItem::Conflict:
+    case SyncFileItem::FileIgnored:
+    case SyncFileItem::NoStatus:
+    case SyncFileItem::BlacklistedError:
+    case SyncFileItem::FileLocked:
+    case SyncFileItem::FileNameInvalid:
+        // nothing
+        break;
+    }
+
+    if (item->hasErrorStatus()) {
+        qCWarning(lcPropagator) << "Could not complete propagation of" << item->destination() << "by" << this << "with status" << item->_status << "and error:" << item->_errorString;
+    } else {
+        qCInfo(lcPropagator) << "Completed propagation of" << item->destination() << "by" << this << "with status" << item->_status;
+    }
+
+    if (item->_status == SyncFileItem::FatalError) {
+        // Abort all remaining jobs.
+        propagator()->abort();
+    }
+
     emit propagator()->itemCompleted(item);
 
     switch (item->_status)
@@ -492,13 +546,56 @@ void BulkPropagatorJob::done(SyncFileItemPtr item,
     }
 
     if (_items.empty()) {
+        if (!_jobs.empty()) {
+            // just wait for the other job to finish.
+            return;
+        }
+
         qCInfo(lcBulkPropagatorJob) << "final status" << _finalStatus;
         emit finished(_finalStatus);
+        propagator()->scheduleNextJob();
     } else {
         qCInfo(lcBulkPropagatorJob) << "remaining upload tasks" << _items.size();
+        scheduleSelfOrChild();
+    }
+}
+
+void BulkPropagatorJob::startPollJob(SyncFileItemPtr item,
+                                     UploadFileInfo fileToUpload,
+                                     const QString &path)
+{
+    auto *job = new PollJob(propagator()->account(), path, item,
+        propagator()->_journal, propagator()->localPath(), this);
+    connect(job, &PollJob::finishedSignal, this, [this, fileToUpload] () {
+        slotPollFinished(fileToUpload);
+    });
+    SyncJournalDb::PollInfo info;
+    info._file = item->_file;
+    info._url = path;
+    info._modtime = item->_modtime;
+    info._fileSize = item->_size;
+    propagator()->_journal->setPollInfo(info);
+    propagator()->_journal->commit("add poll info");
+    _jobs.append(job);
+    job->start();
+    if (!_items.empty()) {
+        scheduleSelfOrChild();
+    }
+}
+
+void BulkPropagatorJob::slotPollFinished(UploadFileInfo fileToUpload)
+{
+    auto *job = qobject_cast<PollJob *>(sender());
+    ASSERT(job);
+
+    slotJobDestroyed(job);
+
+    if (job->_item->_status != SyncFileItem::Success) {
+        done(job->_item, job->_item->_status, job->_item->_errorString);
+        return;
     }
 
-    propagator()->scheduleNextJob();
+    finalize(job->_item, fileToUpload);
 }
 
 QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item)
@@ -506,8 +603,9 @@ QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item)
     QMap<QByteArray, QByteArray> headers;
     headers[QByteArrayLiteral("Content-Type")] = QByteArrayLiteral("application/octet-stream");
     headers[QByteArrayLiteral("X-OC-Mtime")] = QByteArray::number(qint64(item->_modtime));
-    if (qEnvironmentVariableIntValue("OWNCLOUD_LAZYOPS"))
+    if (qEnvironmentVariableIntValue("OWNCLOUD_LAZYOPS")) {
         headers[QByteArrayLiteral("OC-LazyOps")] = QByteArrayLiteral("true");
+    }
 
     if (item->_file.contains(QLatin1String(".sys.admin#recall#"))) {
         // This is a file recall triggered by the admin.  Note: the
@@ -532,14 +630,18 @@ QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item)
     auto conflictRecord = propagator()->_journal->conflictRecord(item->_file.toUtf8());
     if (conflictRecord.isValid()) {
         headers[QByteArrayLiteral("OC-Conflict")] = "1";
-        if (!conflictRecord.initialBasePath.isEmpty())
+        if (!conflictRecord.initialBasePath.isEmpty()) {
             headers[QByteArrayLiteral("OC-ConflictInitialBasePath")] = conflictRecord.initialBasePath;
-        if (!conflictRecord.baseFileId.isEmpty())
+        }
+        if (!conflictRecord.baseFileId.isEmpty()) {
             headers[QByteArrayLiteral("OC-ConflictBaseFileId")] = conflictRecord.baseFileId;
-        if (conflictRecord.baseModtime != -1)
+        }
+        if (conflictRecord.baseModtime != -1) {
             headers[QByteArrayLiteral("OC-ConflictBaseMtime")] = QByteArray::number(conflictRecord.baseModtime);
-        if (!conflictRecord.baseEtag.isEmpty())
+        }
+        if (!conflictRecord.baseEtag.isEmpty()) {
             headers[QByteArrayLiteral("OC-ConflictBaseEtag")] = conflictRecord.baseEtag;
+        }
     }
 
     return headers;

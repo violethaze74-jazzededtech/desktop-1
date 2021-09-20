@@ -174,7 +174,7 @@ static SyncJournalErrorBlacklistRecord createBlacklistEntry(
  *
  * May adjust the status or item._errorString.
  */
-static void blacklistUpdate(SyncJournalDb *journal, SyncFileItem &item)
+void blacklistUpdate(SyncJournalDb *journal, SyncFileItem &item)
 {
     SyncJournalErrorBlacklistRecord oldEntry = journal->errorBlacklistEntry(item._file);
 

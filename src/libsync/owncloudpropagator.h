@@ -48,6 +48,8 @@ qint64 criticalFreeSpaceLimit();
  */
 qint64 freeSpaceLimit();
 
+void blacklistUpdate(SyncJournalDb *journal, SyncFileItem &item);
+
 class SyncJournalDb;
 class OwncloudPropagator;
 class PropagatorCompositeJob;
