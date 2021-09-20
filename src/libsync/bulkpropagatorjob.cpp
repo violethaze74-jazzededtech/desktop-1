@@ -79,7 +79,7 @@ bool BulkPropagatorJob::scheduleSelfOrChild()
         fileToUpload._path = propagator()->fullLocalPath(fileToUpload._file);
         startUploadFile(currentItem, fileToUpload);
     }); // We could be in a different thread (neon jobs)
-    return true;
+    return _items.empty();
 }
 
 PropagatorJob::JobParallelism BulkPropagatorJob::parallelism()
@@ -177,8 +177,6 @@ void BulkPropagatorJob::doStartUpload(SyncFileItemPtr item,
     adjustLastJobTimeout(job, fileSize);
     job->start();
     //propagator()->_activeJobList.append(this);
-
-    propagator()->scheduleNextJob();
 }
 
 void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
@@ -383,7 +381,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     QByteArray fid = job->reply()->rawHeader("OC-FileID");
     if (!fid.isEmpty()) {
         if (!item->_fileId.isEmpty() && item->_fileId != fid) {
-            qCWarning(lcPropagateUploadV1) << "File ID changed!" << item->_fileId << fid;
+            qCWarning(lcBulkPropagatorJob) << "File ID changed!" << item->_fileId << fid;
         }
         item->_fileId = fid;
     }
@@ -393,7 +391,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     if (job->reply()->rawHeader("X-OC-MTime") != "accepted") {
         // X-OC-MTime is supported since owncloud 5.0.   But not when chunking.
         // Normally Owncloud 6 always puts X-OC-MTime
-        qCWarning(lcPropagateUploadV1) << "Server does not support X-OC-MTime" << job->reply()->rawHeader("X-OC-MTime");
+        qCWarning(lcBulkPropagatorJob) << "Server does not support X-OC-MTime" << job->reply()->rawHeader("X-OC-MTime");
         // Well, the mtime was not set
     }
 
@@ -499,6 +497,8 @@ void BulkPropagatorJob::done(SyncFileItemPtr item,
     } else {
         qCInfo(lcBulkPropagatorJob) << "remaining upload tasks" << _items.size();
     }
+
+    propagator()->scheduleNextJob();
 }
 
 QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item)
@@ -560,11 +560,11 @@ void BulkPropagatorJob::checkResettingErrors(SyncFileItemPtr item)
         auto uploadInfo = propagator()->_journal->getUploadInfo(item->_file);
         uploadInfo._errorCount += 1;
         if (uploadInfo._errorCount > 3) {
-            qCInfo(lcPropagateUpload) << "Reset transfer of" << item->_file
+            qCInfo(lcBulkPropagatorJob) << "Reset transfer of" << item->_file
                                       << "due to repeated error" << item->_httpErrorCode;
             uploadInfo = SyncJournalDb::UploadInfo();
         } else {
-            qCInfo(lcPropagateUpload) << "Error count for maybe-reset error" << item->_httpErrorCode
+            qCInfo(lcBulkPropagatorJob) << "Error count for maybe-reset error" << item->_httpErrorCode
                                       << "on file" << item->_file
                                       << "is" << uploadInfo._errorCount;
         }
@@ -579,7 +579,7 @@ void BulkPropagatorJob::commonErrorHandling(SyncFileItemPtr item,
 {
     QByteArray replyContent;
     QString errorString = job->errorStringParsingBody(&replyContent);
-    qCDebug(lcPropagateUpload) << replyContent; // display the XML error in the debug
+    qCDebug(lcBulkPropagatorJob) << replyContent; // display the XML error in the debug
 
     if (item->_httpErrorCode == 412) {
         // Precondition Failed: Either an etag or a checksum mismatch.
