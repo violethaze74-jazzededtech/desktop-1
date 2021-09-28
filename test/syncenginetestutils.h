@@ -148,6 +148,7 @@ public:
     void fixupParentPathRecursively();
 
     QString name;
+    int operationStatus = 200;
     bool isDir = true;
     bool isShared = false;
     OCC::RemotePermissions permissions; // When uset, defaults to everything
@@ -212,6 +213,27 @@ public:
 
     void abort() override;
     qint64 readData(char *, qint64) override { return 0; }
+};
+
+class FakePutMultiFileReply : public FakeReply
+{
+    Q_OBJECT
+public:
+    FakePutMultiFileReply(FileInfo &remoteRootFileInfo, QNetworkAccessManager::Operation op, const QNetworkRequest &request, const QString &contentType, const QByteArray &putPayload, QObject *parent);
+
+    static QVector<FileInfo *> performMultiPart(FileInfo &remoteRootFileInfo, const QNetworkRequest &request, const QByteArray &putPayload, const QString &contentType);
+
+    Q_INVOKABLE virtual void respond();
+
+    void abort() override;
+
+    qint64 bytesAvailable() const override;
+    qint64 readData(char *data, qint64 maxlen) override;
+
+private:
+    QVector<FileInfo *> _allFileInfo;
+
+    QByteArray _payload;
 };
 
 class FakeMkcolReply : public FakeReply
@@ -409,6 +431,12 @@ public:
 
     void setOverride(const Override &override) { _override = override; }
 
+    QNetworkReply *forEachReplyPart(QIODevice *outgoingData,
+                                    const QString &contentType,
+                                    std::function<QNetworkReply *(const QMap<QString, QByteArray> &)> replyFunction);
+
+    QNetworkReply *overrideReplyWithError(QString fileName, Operation op, QNetworkRequest newRequest);
+
 protected:
     QNetworkReply *createRequest(Operation op, const QNetworkRequest &request,
         QIODevice *outgoingData = nullptr) override;
@@ -467,6 +495,11 @@ public:
     };
     ErrorList serverErrorPaths() { return {_fakeQnam}; }
     void setServerOverride(const FakeQNAM::Override &override) { _fakeQnam->setOverride(override); }
+    QNetworkReply * forEachReplyPart(QIODevice *outgoingData,
+                                     const QString &contentType,
+                                     std::function<QNetworkReply*(const QMap<QString, QByteArray>&)> replyFunction) {
+        return _fakeQnam->forEachReplyPart(outgoingData, contentType, replyFunction);
+    }
 
     QString localPath() const;
 

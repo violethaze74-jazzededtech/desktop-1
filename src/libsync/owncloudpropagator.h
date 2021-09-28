@@ -602,11 +602,7 @@ public:
 
     Q_REQUIRED_RESULT bool isDelayedUploadItem(const SyncFileItemPtr &item) const;
 
-<<<<<<< HEAD
-    Q_REQUIRED_RESULT const QVector<SyncFileItemPtr>& delayedTasks() const
-=======
     Q_REQUIRED_RESULT const std::deque<SyncFileItemPtr>& delayedTasks() const
->>>>>>> b17f5cb8c (implement single job to upload multiple files)
     {
         return _delayedTasks;
     }
@@ -614,6 +610,8 @@ public:
     void setScheduleDelayedTasks(bool active);
 
     void clearDelayedTasks();
+
+    static void allowDelayedUpload(bool enable);
 
 private slots:
 
@@ -671,6 +669,8 @@ private:
 
     std::deque<SyncFileItemPtr> _delayedTasks;
     bool _scheduleDelayedTasks = false;
+
+    static bool _allowDelayedUpload;
 };
 
 

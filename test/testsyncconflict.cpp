@@ -95,17 +95,34 @@ private slots:
         QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
 
         QMap<QByteArray, QString> conflictMap;
-        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *) -> QNetworkReply * {
+        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *outgoingData) -> QNetworkReply * {
             if (op == QNetworkAccessManager::PutOperation) {
-                if (request.rawHeader("OC-Conflict") == "1") {
-                    auto baseFileId = request.rawHeader("OC-ConflictBaseFileId");
-                    auto components = request.url().toString().split('/');
-                    QString conflictFile = components.mid(components.size() - 2).join('/');
-                    conflictMap[baseFileId] = conflictFile;
-                    [&] {
-                        QVERIFY(!baseFileId.isEmpty());
-                        QCOMPARE(request.rawHeader("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
-                    }();
+                auto contentType = request.header(QNetworkRequest::ContentTypeHeader).toString();
+                if (contentType.startsWith(QStringLiteral("multipart/mixed; boundary="))) {
+                    return fakeFolder.forEachReplyPart(outgoingData, contentType, [&conflictMap] (const QMap<QString, QByteArray> &allHeaders) -> QNetworkReply * {
+                        if (allHeaders.value("OC-Conflict") == "1") {
+                            auto baseFileId = allHeaders.value("OC-ConflictBaseFileId");
+                            auto components = allHeaders.value("OC-Path").split('/');
+                            QString conflictFile = components.mid(components.size() - 2).join('/');
+                            conflictMap[baseFileId] = conflictFile;
+                            [&] {
+                                QVERIFY(!baseFileId.isEmpty());
+                                QCOMPARE(allHeaders.value("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
+                            }();
+                        }
+                        return nullptr;
+                    });
+                } else {
+                    if (request.rawHeader("OC-Conflict") == "1") {
+                        auto baseFileId = request.rawHeader("OC-ConflictBaseFileId");
+                        auto components = request.url().toString().split('/');
+                        QString conflictFile = components.mid(components.size() - 2).join('/');
+                        conflictMap[baseFileId] = conflictFile;
+                        [&] {
+                            QVERIFY(!baseFileId.isEmpty());
+                            QCOMPARE(request.rawHeader("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
+                        }();
+                    }
                 }
             }
             return nullptr;
@@ -145,17 +162,34 @@ private slots:
         QCOMPARE(fakeFolder.currentLocalState(), fakeFolder.currentRemoteState());
 
         QMap<QByteArray, QString> conflictMap;
-        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *) -> QNetworkReply * {
+        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *outgoingData) -> QNetworkReply * {
             if (op == QNetworkAccessManager::PutOperation) {
-                if (request.rawHeader("OC-Conflict") == "1") {
-                    auto baseFileId = request.rawHeader("OC-ConflictBaseFileId");
-                    auto components = request.url().toString().split('/');
-                    QString conflictFile = components.mid(components.size() - 2).join('/');
-                    conflictMap[baseFileId] = conflictFile;
-                    [&] {
-                        QVERIFY(!baseFileId.isEmpty());
-                        QCOMPARE(request.rawHeader("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
-                    }();
+                auto contentType = request.header(QNetworkRequest::ContentTypeHeader).toString();
+                if (contentType.startsWith(QStringLiteral("multipart/mixed; boundary="))) {
+                    fakeFolder.forEachReplyPart(outgoingData, contentType, [&conflictMap] (const QMap<QString, QByteArray> &allHeaders) -> QNetworkReply * {
+                        if (allHeaders.value("OC-Conflict") == "1") {
+                            auto baseFileId = allHeaders.value("OC-ConflictBaseFileId");
+                            auto components = allHeaders.value("OC-Path").split('/');
+                            QString conflictFile = components.mid(components.size() - 2).join('/');
+                            conflictMap[baseFileId] = conflictFile;
+                            [&] {
+                                QVERIFY(!baseFileId.isEmpty());
+                                QCOMPARE(allHeaders.value("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
+                            }();
+                        }
+                        return nullptr;
+                    });
+                } else {
+                    if (request.rawHeader("OC-Conflict") == "1") {
+                        auto baseFileId = request.rawHeader("OC-ConflictBaseFileId");
+                        auto components = request.url().toString().split('/');
+                        QString conflictFile = components.mid(components.size() - 2).join('/');
+                        conflictMap[baseFileId] = conflictFile;
+                        [&] {
+                            QVERIFY(!baseFileId.isEmpty());
+                            QCOMPARE(request.rawHeader("OC-ConflictInitialBasePath"), Utility::conflictFileBaseNameFromPattern(conflictFile.toUtf8()));
+                        }();
+                    }
                 }
             }
             return nullptr;

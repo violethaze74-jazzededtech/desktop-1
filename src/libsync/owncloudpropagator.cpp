@@ -52,6 +52,8 @@ Q_LOGGING_CATEGORY(lcDirectory, "nextcloud.sync.propagator.directory", QtInfoMsg
 Q_LOGGING_CATEGORY(lcRootDirectory, "nextcloud.sync.propagator.root.directory", QtInfoMsg)
 Q_LOGGING_CATEGORY(lcCleanupPolls, "nextcloud.sync.propagator.cleanuppolls", QtInfoMsg)
 
+bool OwncloudPropagator::_allowDelayedUpload = true;
+
 qint64 criticalFreeSpaceLimit()
 {
     qint64 value = 50 * 1000 * 1000LL;
@@ -862,7 +864,7 @@ Result<Vfs::ConvertToPlaceholderResult, QString> OwncloudPropagator::staticUpdat
 
 bool OwncloudPropagator::isDelayedUploadItem(const SyncFileItemPtr &item) const
 {
-    return !_scheduleDelayedTasks && !item->_isEncrypted && _syncOptions._minChunkSize > item->_size;
+    return _allowDelayedUpload && !_scheduleDelayedTasks && !item->_isEncrypted && _syncOptions._minChunkSize > item->_size;
 }
 
 void OwncloudPropagator::setScheduleDelayedTasks(bool active)
@@ -873,6 +875,11 @@ void OwncloudPropagator::setScheduleDelayedTasks(bool active)
 void OwncloudPropagator::clearDelayedTasks()
 {
     _delayedTasks.clear();
+}
+
+void OwncloudPropagator::allowDelayedUpload(bool enable)
+{
+    _allowDelayedUpload = enable;
 }
 
 // ================================================================================

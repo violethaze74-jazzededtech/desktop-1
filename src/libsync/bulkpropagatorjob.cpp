@@ -14,6 +14,7 @@
 
 #include "bulkpropagatorjob.h"
 
+#include "putmultifilejob.h"
 #include "owncloudpropagator_p.h"
 #include "syncfileitem.h"
 #include "syncengine.h"
@@ -23,9 +24,20 @@
 #include "account.h"
 #include "common/utility.h"
 #include "common/checksums.h"
+#include "networkjobs.h"
 
 #include <QFileInfo>
 #include <QDir>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonValue>
+
+namespace OCC {
+
+Q_LOGGING_CATEGORY(lcBulkPropagatorJob, "nextcloud.sync.propagator.bulkupload", QtInfoMsg)
+
+}
 
 namespace {
 
@@ -48,11 +60,28 @@ bool fileIsStillChanging(const OCC::SyncFileItem &item)
         && msSinceMod > -10000;
 }
 
+inline QByteArray getEtagFromJsonReply(const QJsonObject &reply)
+{
+    QByteArray ocEtag = OCC::parseEtag(reply.value("OC-ETag").toString().toLatin1());
+    QByteArray etag = OCC::parseEtag(reply.value("ETag").toString().toLatin1());
+    QByteArray ret = ocEtag;
+    if (ret.isEmpty()) {
+        ret = etag;
+    }
+    if (ocEtag.length() > 0 && ocEtag != etag) {
+        qCDebug(OCC::lcBulkPropagatorJob) << "Quite peculiar, we have an etag != OC-Etag [no problem!]" << etag << ocEtag;
+    }
+    return ret;
+}
+
+inline QByteArray getHeaderFromJsonReply(const QJsonObject &reply, const QByteArray &headerName)
+{
+    return reply.value(headerName).toString().toLatin1();
+}
+
 }
 
 namespace OCC {
-
-Q_LOGGING_CATEGORY(lcBulkPropagatorJob, "nextcloud.sync.propagator.bulkupload", QtInfoMsg)
 
 BulkPropagatorJob::BulkPropagatorJob(OwncloudPropagator *propagator,
                                      const std::deque<SyncFileItemPtr> &items)
@@ -139,6 +168,21 @@ void BulkPropagatorJob::doStartUpload(SyncFileItemPtr item,
     currentHeaders[QByteArrayLiteral("OC-Total-Length")] = QByteArray::number(fileSize);
     currentHeaders[QByteArrayLiteral("OC-Chunk-Size")] = QByteArray::number(fileSize);
 
+    if (!item->_renameTarget.isEmpty() && item->_file != item->_renameTarget) {
+        // Try to rename the file
+        const auto originalFilePathAbsolute = propagator()->fullLocalPath(item->_file);
+        const auto newFilePathAbsolute = propagator()->fullLocalPath(item->_renameTarget);
+        const auto renameSuccess = QFile::rename(originalFilePathAbsolute, newFilePathAbsolute);
+        if (!renameSuccess) {
+            done(item, SyncFileItem::NormalError, "File contains trailing spaces and couldn't be renamed");
+            return;
+        }
+        qCWarning(lcBulkPropagatorJob()) << item->_file << item->_renameTarget;
+        fileToUpload._file = item->_file = item->_renameTarget;
+        fileToUpload._path = propagator()->fullLocalPath(fileToUpload._file);
+        item->_modtime = FileSystem::getModTime(newFilePathAbsolute);
+    }
+
     QString path = fileToUpload._file;
 
     qCInfo(lcBulkPropagatorJob) << propagator()->fullRemotePath(path) << "transmission checksum" << transmissionChecksumHeader;
@@ -162,16 +206,17 @@ void BulkPropagatorJob::doStartUpload(SyncFileItemPtr item,
 
     // job takes ownership of device via a QScopedPointer. Job deletes itself when finishing
     auto devicePtr = device.get(); // for connections later
-    auto *job = new PUTFileJob(propagator()->account(), propagator()->fullRemotePath(path), std::move(device), currentHeaders, 0, this);
-    _jobs.append(job);
-    connect(job, &PUTFileJob::finishedSignal, this, [this, item, fileToUpload] () {
+    auto job = std::make_unique<PutMultiFileJob>(propagator()->account(), propagator()->fullRemotePath(path), std::move(device), currentHeaders, 0, this);
+    connect(job.get(), &PutMultiFileJob::finishedSignal, this, [this, item, fileToUpload] () {
         slotPutFinished(item, fileToUpload);
     });
-    connect(job, &PUTFileJob::uploadProgress, this, &BulkPropagatorJob::slotUploadProgress);
-    connect(job, &PUTFileJob::uploadProgress, devicePtr, &UploadDevice::slotJobUploadProgress);
-    connect(job, &QObject::destroyed, this, &BulkPropagatorJob::slotJobDestroyed);
-    adjustLastJobTimeout(job, fileSize);
+    connect(job.get(), &PutMultiFileJob::uploadProgress, this, &BulkPropagatorJob::slotUploadProgress);
+    connect(job.get(), &PutMultiFileJob::uploadProgress, devicePtr, &UploadDevice::slotJobUploadProgress);
+    connect(job.get(), &QObject::destroyed, this, &BulkPropagatorJob::slotJobDestroyed);
+    adjustLastJobTimeout(job.get(), fileSize);
+    _jobs.append(job.get());
     job->start();
+    job.release();
 }
 
 void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
@@ -205,16 +250,17 @@ void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
     }
 
     // Compute the content checksum.
-    auto computeChecksum = new ComputeChecksum(this);
+    auto computeChecksum = std::make_unique<ComputeChecksum>(this);
     computeChecksum->setChecksumType(checksumType);
 
-    connect(computeChecksum, &ComputeChecksum::done,
-        this, [this, item, fileToUpload] (const QByteArray &contentChecksumType, const QByteArray &contentChecksum) {
+    connect(computeChecksum.get(), &ComputeChecksum::done,
+            this, [this, item, fileToUpload] (const QByteArray &contentChecksumType, const QByteArray &contentChecksum) {
         slotComputeTransmissionChecksum(item, fileToUpload, contentChecksumType, contentChecksum);
     });
-    connect(computeChecksum, &ComputeChecksum::done,
-        computeChecksum, &QObject::deleteLater);
+    connect(computeChecksum.get(), &ComputeChecksum::done,
+            computeChecksum.get(), &QObject::deleteLater);
     computeChecksum->start(fileToUpload._path);
+    computeChecksum.release();
 }
 
 void BulkPropagatorJob::slotComputeTransmissionChecksum(SyncFileItemPtr item,
@@ -233,20 +279,21 @@ void BulkPropagatorJob::slotComputeTransmissionChecksum(SyncFileItemPtr item,
     }
 
     // Compute the transmission checksum.
-    auto computeChecksum = new ComputeChecksum(this);
+    auto computeChecksum = std::make_unique<ComputeChecksum>(this);
     if (uploadChecksumEnabled()) {
         computeChecksum->setChecksumType(propagator()->account()->capabilities().uploadChecksumType());
     } else {
         computeChecksum->setChecksumType(QByteArray());
     }
 
-    connect(computeChecksum, &ComputeChecksum::done,
-        this, [this, item, fileToUpload] (const QByteArray &contentChecksumType, const QByteArray &contentChecksum) {
+    connect(computeChecksum.get(), &ComputeChecksum::done,
+            this, [this, item, fileToUpload] (const QByteArray &contentChecksumType, const QByteArray &contentChecksum) {
         slotStartUpload(item, fileToUpload, contentChecksumType, contentChecksum);
     });
-    connect(computeChecksum, &ComputeChecksum::done,
-        computeChecksum, &QObject::deleteLater);
+    connect(computeChecksum.get(), &ComputeChecksum::done,
+            computeChecksum.get(), &QObject::deleteLater);
     computeChecksum->start(fileToUpload._path);
+    computeChecksum.release();
 }
 
 void BulkPropagatorJob::slotStartUpload(SyncFileItemPtr item,
@@ -306,7 +353,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
                                         UploadFileInfo fileToUpload)
 {
     qCInfo(lcBulkPropagatorJob()) << item->_file;
-    auto *job = qobject_cast<PUTFileJob *>(sender());
+    auto *job = qobject_cast<PutMultiFileJob *>(sender());
     ASSERT(job);
 
     bool finished = false;
@@ -322,9 +369,28 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
         return;
     }
 
+    auto replyData = QByteArray{};
+    while(job->reply()->bytesAvailable()) {
+        replyData += job->reply()->readAll();
+    }
+
+    auto replyJson = QJsonDocument::fromJson(replyData);
+    auto replyArray = replyJson.array();
+    auto fileReply = QJsonObject{};
+    for (const auto &oneReply : replyArray) {
+        auto replyObject = oneReply.toObject();
+        qCDebug(lcBulkPropagatorJob()) << "searching for reply" << replyObject << item->_file;
+        if (replyObject.value("OC-Path").toString() == item->_file) {
+            fileReply = replyObject;
+            break;
+        }
+    }
+
+    qCInfo(lcBulkPropagatorJob()) << "file headers" << fileReply;
+
     // The server needs some time to process the request and provide us with a poll URL
     if (item->_httpErrorCode == 202) {
-        QString path = QString::fromUtf8(job->reply()->rawHeader("OC-JobStatus-Location"));
+        QString path = QString::fromUtf8(getHeaderFromJsonReply(fileReply, "OC-JobStatus-Location"));
         if (path.isEmpty()) {
             done(item, SyncFileItem::NormalError, tr("Poll URL missing"));
             return;
@@ -343,7 +409,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     // But if the upload is ongoing, because not all chunks were uploaded
     // yet, the upload can be stopped and an error can be displayed, because
     // the server hasn't registered the new file yet.
-    QByteArray etag = getEtagFromReply(job->reply());
+    QByteArray etag = getEtagFromJsonReply(fileReply);
     finished = etag.length() > 0;
 
     // Check if the file still exists
@@ -369,7 +435,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     }
 
     // the file id should only be empty for new files up- or downloaded
-    QByteArray fid = job->reply()->rawHeader("OC-FileID");
+    QByteArray fid = getHeaderFromJsonReply(fileReply, "OC-FileID");
     if (!fid.isEmpty()) {
         if (!item->_fileId.isEmpty() && item->_fileId != fid) {
             qCWarning(lcBulkPropagatorJob) << "File ID changed!" << item->_fileId << fid;
@@ -379,10 +445,10 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
 
     item->_etag = etag;
 
-    if (job->reply()->rawHeader("X-OC-MTime") != "accepted") {
+    if (getHeaderFromJsonReply(fileReply, "X-OC-MTime") != "accepted") {
         // X-OC-MTime is supported since owncloud 5.0.   But not when chunking.
         // Normally Owncloud 6 always puts X-OC-MTime
-        qCWarning(lcBulkPropagatorJob) << "Server does not support X-OC-MTime" << job->reply()->rawHeader("X-OC-MTime");
+        qCWarning(lcBulkPropagatorJob) << "Server does not support X-OC-MTime" << getHeaderFromJsonReply(fileReply, "X-OC-MTime");
         // Well, the mtime was not set
     }
 
@@ -564,9 +630,11 @@ void BulkPropagatorJob::startPollJob(SyncFileItemPtr item,
                                      UploadFileInfo fileToUpload,
                                      const QString &path)
 {
-    auto *job = new PollJob(propagator()->account(), path, item,
-        propagator()->_journal, propagator()->localPath(), this);
-    connect(job, &PollJob::finishedSignal, this, [this, fileToUpload] () {
+    auto job = std::make_unique<PollJob>(propagator()->account(),
+                                         path, item,
+                                         propagator()->_journal,
+                                         propagator()->localPath(), this);
+    connect(job.get(), &PollJob::finishedSignal, this, [this, fileToUpload] () {
         slotPollFinished(fileToUpload);
     });
     SyncJournalDb::PollInfo info;
@@ -576,8 +644,9 @@ void BulkPropagatorJob::startPollJob(SyncFileItemPtr item,
     info._fileSize = item->_size;
     propagator()->_journal->setPollInfo(info);
     propagator()->_journal->commit("add poll info");
-    _jobs.append(job);
+    _jobs.append(job.get());
     job->start();
+    job.release();
     if (!_items.empty()) {
         scheduleSelfOrChild();
     }

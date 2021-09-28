@@ -540,8 +540,16 @@ private slots:
                     && "Should not touch uploads endpoint when not chunking");
             }
             if (!chunking && op == QNetworkAccessManager::PutOperation) {
-                checksumHeader = request.rawHeader("OC-Checksum");
-                return new DelayedReply<FakePutReply>(responseDelay, fakeFolder.remoteModifier(), op, request, outgoingData->readAll(), &fakeFolder.syncEngine());
+                auto contentType = request.header(QNetworkRequest::ContentTypeHeader).toString();
+                if (contentType.startsWith(QStringLiteral("multipart/mixed; boundary="))) {
+                    return fakeFolder.forEachReplyPart(outgoingData, contentType, [&checksumHeader, &responseDelay, &fakeFolder, &op, &request, &contentType, &outgoingData] (const QMap<QString, QByteArray> &allHeaders) -> QNetworkReply * {
+                        checksumHeader = allHeaders.value("OC-Checksum");
+                        return new DelayedReply<FakePutMultiFileReply>(responseDelay, fakeFolder.remoteModifier(), op, request, contentType, outgoingData->readAll(), &fakeFolder.syncEngine());
+                    });
+                } else {
+                    checksumHeader = request.rawHeader("OC-Checksum");
+                    return new DelayedReply<FakePutReply>(responseDelay, fakeFolder.remoteModifier(), op, request, outgoingData->readAll(), &fakeFolder.syncEngine());
+                }
             } else if (chunking && request.attribute(QNetworkRequest::CustomVerbAttribute) == "MOVE") {
                 checksumHeader = request.rawHeader("OC-Checksum");
                 return new DelayedReply<FakeChunkMoveReply>(responseDelay, fakeFolder.uploadState(), fakeFolder.remoteModifier(), op, request, &fakeFolder.syncEngine());

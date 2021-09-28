@@ -7,7 +7,8 @@
 
 #include <QtTest>
 #include "syncenginetestutils.h"
-#include <syncengine.h>
+#include "syncengine.h"
+#include "owncloudpropagator.h"
 
 using namespace OCC;
 
@@ -50,6 +51,7 @@ private slots:
 
     void asyncUploadOperations()
     {
+        OwncloudPropagator::allowDelayedUpload(false);
         FakeFolder fakeFolder{ FileInfo::A12_B12_C12_S12() };
         fakeFolder.syncEngine().account()->setCapabilities({ { "dav", QVariantMap{ { "chunking", "1.0" } } } });
         // Reduce max chunk size a bit so we get more chunks

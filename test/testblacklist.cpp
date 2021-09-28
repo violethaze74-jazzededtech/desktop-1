@@ -43,12 +43,24 @@ private slots:
         int counter = 0;
         const QByteArray testFileName = QByteArrayLiteral("A/new");
         QByteArray reqId;
-        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &req, QIODevice *) -> QNetworkReply * {
+        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &req, QIODevice *outgoingData) -> QNetworkReply * {
             if (req.url().path().endsWith(testFileName)) {
                 reqId = req.rawHeader("X-Request-ID");
+            } else if (op == QNetworkAccessManager::PutOperation) {
+                auto contentType = req.header(QNetworkRequest::ContentTypeHeader).toString();
+                if (contentType.startsWith(QStringLiteral("multipart/mixed; boundary="))) {
+                    fakeFolder.forEachReplyPart(outgoingData, contentType, [req, testFileName, &reqId] (const QMap<QString, QByteArray> &allHeaders) -> QNetworkReply * {
+                        auto fileName = allHeaders[QStringLiteral("OC-Path")];
+                        if (fileName.endsWith(testFileName)) {
+                            reqId = req.rawHeader("X-Request-ID");
+                        }
+                        return nullptr;
+                    });
+                }
             }
-            if (!remote && op == QNetworkAccessManager::PutOperation)
+            if (!remote && op == QNetworkAccessManager::PutOperation) {
                 ++counter;
+            }
             if (remote && op == QNetworkAccessManager::GetOperation)
                 ++counter;
             return nullptr;

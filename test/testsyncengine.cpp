@@ -490,12 +490,24 @@ private slots:
         int remoteQuota = 1000;
         int n507 = 0, nPUT = 0;
         QObject parent;
-        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *) -> QNetworkReply * {
+        fakeFolder.setServerOverride([&](QNetworkAccessManager::Operation op, const QNetworkRequest &request, QIODevice *outgoingData) -> QNetworkReply * {
             if (op == QNetworkAccessManager::PutOperation) {
-                nPUT++;
-                if (request.rawHeader("OC-Total-Length").toInt() > remoteQuota) {
-                    n507++;
-                    return new FakeErrorReply(op, request, &parent, 507);
+                auto contentType = request.header(QNetworkRequest::ContentTypeHeader).toString();
+                if (contentType.startsWith(QStringLiteral("multipart/mixed; boundary="))) {
+                    return fakeFolder.forEachReplyPart(outgoingData, contentType, [&nPUT, &n507, remoteQuota, op, &request, &parent] (const QMap<QString, QByteArray> &allHeaders) -> QNetworkReply * {
+                        nPUT++;
+                        if (allHeaders.value("OC-Total-Length").toInt() > remoteQuota) {
+                            n507++;
+                            return new FakeErrorReply(op, request, &parent, 507);
+                        }
+                        return nullptr;
+                    });
+                } else {
+                    nPUT++;
+                    if (request.rawHeader("OC-Total-Length").toInt() > remoteQuota) {
+                        n507++;
+                        return new FakeErrorReply(op, request, &parent, 507);
+                    }
                 }
             }
             return nullptr;
