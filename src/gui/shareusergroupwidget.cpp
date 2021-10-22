@@ -12,7 +12,9 @@
  * for more details.
  */
 
+#include "ocsprofileconnector.h"
 #include "sharee.h"
+#include "tray/usermodel.h"
 #include "ui_shareusergroupwidget.h"
 #include "ui_shareuserline.h"
 #include "shareusergroupwidget.h"
@@ -36,6 +38,8 @@
 #include <QFileInfo>
 #include <QAbstractProxyModel>
 #include <QCompleter>
+#include <qboxlayout.h>
+#include <qicon.h>
 #include <qlayout.h>
 #include <QPropertyAnimation>
 #include <QMenu>
@@ -50,12 +54,30 @@
 #include <QSvgRenderer>
 
 #include <cstring>
+#include <qobject.h>
+#include <qpushbutton.h>
 
 namespace {
-    const char *passwordIsSetPlaceholder = "●●●●●●●●";
+const char *passwordIsSetPlaceholder = "●●●●●●●●";
+
 }
 
 namespace OCC {
+
+AvatarEventFilter::AvatarEventFilter(QObject *parent)
+    : QObject(parent)
+{
+}
+
+
+bool AvatarEventFilter::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonRelease) {
+        emit clicked();
+        return true;
+    }
+    return QObject::eventFilter(obj, event);
+}
 
 ShareUserGroupWidget::ShareUserGroupWidget(AccountPtr account,
     const QString &sharePath,
@@ -618,9 +640,26 @@ ShareUserLine::ShareUserLine(AccountPtr account,
         _permissionReshare->setVisible(false);
     }
 
+    auto avatarEventFilter = new AvatarEventFilter(_ui->avatar);
+    connect(avatarEventFilter, &AvatarEventFilter::clicked, this, &ShareUserLine::onAvatarClicked);
+    _ui->avatar->installEventFilter(avatarEventFilter);
+
+
+    _ui->profilePageWidget->setProfileConnector(
+        std::make_unique<OcsProfileConnector>(share->account()), share->getShareWith()->shareWith());
+    _ui->profilePageWidget->setVisible(false);
+
     loadAvatar();
 
     customizeStyle();
+}
+
+void ShareUserLine::onAvatarClicked()
+{
+    if (_share->getShareType() == Share::TypeUser) {
+        _ui->profilePageWidget->setVisible(!_ui->profilePageWidget->isVisible());
+        emit resizeRequested();
+    }
 }
 
 void ShareUserLine::loadAvatar()

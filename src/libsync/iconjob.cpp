@@ -12,36 +12,32 @@
  * for more details.
  */
 
-#ifndef ICONJOB_H
-#define ICONJOB_H
-
-#include <QObject>
-#include <QByteArray>
-#include <QNetworkAccessManager>
-#include <QNetworkRequest>
-#include <QNetworkReply>
+#include "iconjob.h"
 
 namespace OCC {
 
-/**
- * @brief Job to fetch a icon
- * @ingroup gui
- */
-class IconJob : public QObject
+IconJob::IconJob(const QUrl &url, QObject *parent) :
+    QObject(parent)
 {
-    Q_OBJECT
-public:
-    explicit IconJob(const QUrl &url, QObject *parent = nullptr);
+    connect(&_accessManager, &QNetworkAccessManager::finished,
+            this, &IconJob::finished);
 
-signals:
-    void jobFinished(QByteArray iconData);
-
-private slots:
-    void finished(QNetworkReply *reply);
-
-private:
-    QNetworkAccessManager _accessManager;
-};
+    QNetworkRequest request(url);
+#if (QT_VERSION >= 0x050600)
+    request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
+#endif
+    _accessManager.get(request);
 }
 
-#endif // ICONJOB_H
+void IconJob::finished(QNetworkReply *reply)
+{
+    reply->deleteLater();
+    deleteLater();
+
+    if (reply->error() != QNetworkReply::NoError) {
+        return;
+    }
+
+    emit jobFinished(reply->readAll());
+}
+}

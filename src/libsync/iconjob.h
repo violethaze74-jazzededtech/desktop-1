@@ -12,30 +12,38 @@
  * for more details.
  */
 
-#include "iconjob.h"
+#ifndef ICONJOB_H
+#define ICONJOB_H
+
+#include "owncloudlib.h"
+
+#include <QObject>
+#include <QByteArray>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 
 namespace OCC {
 
-IconJob::IconJob(const QUrl &url, QObject *parent) :
-    QObject(parent)
+/**
+ * @brief Job to fetch a icon
+ * @ingroup gui
+ */
+class OWNCLOUDSYNC_EXPORT IconJob : public QObject
 {
-    connect(&_accessManager, &QNetworkAccessManager::finished,
-            this, &IconJob::finished);
+    Q_OBJECT
+public:
+    explicit IconJob(const QUrl &url, QObject *parent = nullptr);
 
-    QNetworkRequest request(url);
-#if (QT_VERSION >= 0x050600)
-    request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
-#endif
-    _accessManager.get(request);
+signals:
+    void jobFinished(const QByteArray &iconData);
+
+private slots:
+    void finished(QNetworkReply *reply);
+
+private:
+    QNetworkAccessManager _accessManager;
+};
 }
 
-void IconJob::finished(QNetworkReply *reply)
-{
-    if (reply->error() != QNetworkReply::NoError)
-        return;
-
-    reply->deleteLater();
-    deleteLater();
-    emit jobFinished(reply->readAll());
-}
-}
+#endif // ICONJOB_H
