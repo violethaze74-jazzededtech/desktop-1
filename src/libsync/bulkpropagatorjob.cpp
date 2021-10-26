@@ -86,7 +86,7 @@ namespace OCC {
 BulkPropagatorJob::BulkPropagatorJob(OwncloudPropagator *propagator,
                                      const std::deque<SyncFileItemPtr> &items)
     : PropagatorJob(propagator)
-    , _items(std::move(items))
+    , _items(items)
 {
 }
 
@@ -354,7 +354,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
 {
     qCInfo(lcBulkPropagatorJob()) << item->_file;
     auto *job = qobject_cast<PutMultiFileJob *>(sender());
-    ASSERT(job);
+    ASSERT(job)
 
     bool finished = false;
 
@@ -377,7 +377,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     auto replyJson = QJsonDocument::fromJson(replyData);
     auto replyArray = replyJson.array();
     auto fileReply = QJsonObject{};
-    for (const auto &oneReply : replyArray) {
+    for (const auto &oneReply : qAsConst(replyArray)) {
         auto replyObject = oneReply.toObject();
         qCDebug(lcBulkPropagatorJob()) << "searching for reply" << replyObject << item->_file;
         if (replyObject.value("OC-Path").toString() == item->_file) {
@@ -395,7 +395,6 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
             done(item, SyncFileItem::NormalError, tr("Poll URL missing"));
             return;
         }
-        finished = true;
         startPollJob(item, fileToUpload, path);
         return;
     }
@@ -439,7 +438,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     finalize(item, fileToUpload);
 }
 
-void BulkPropagatorJob::slotUploadProgress(qint64, qint64)
+void BulkPropagatorJob::slotUploadProgress(qint64, qint64) const
 {
     qCInfo(lcBulkPropagatorJob()) << "slotUploadProgress";
 }
@@ -450,7 +449,7 @@ void BulkPropagatorJob::slotJobDestroyed(QObject *job)
     _jobs.erase(std::remove(_jobs.begin(), _jobs.end(), job), _jobs.end());
 }
 
-void BulkPropagatorJob::adjustLastJobTimeout(AbstractNetworkJob *job, qint64 fileSize)
+void BulkPropagatorJob::adjustLastJobTimeout(AbstractNetworkJob *job, qint64 fileSize) const
 {
     constexpr double threeMinutes = 3.0 * 60 * 1000;
 
@@ -487,10 +486,8 @@ void BulkPropagatorJob::finalize(SyncFileItemPtr item,
         || item->_instruction == CSYNC_INSTRUCTION_TYPE_CHANGE) {
         auto &vfs = propagator()->syncOptions()._vfs;
         const auto pin = vfs->pinState(item->_file);
-        if (pin && *pin == PinState::OnlineOnly) {
-            if (!vfs->setPinState(item->_file, PinState::Unspecified)) {
-                qCWarning(lcBulkPropagatorJob) << "Could not set pin state of" << item->_file << "to unspecified";
-            }
+        if (pin && *pin == PinState::OnlineOnly && !vfs->setPinState(item->_file, PinState::Unspecified)) {
+            qCWarning(lcBulkPropagatorJob) << "Could not set pin state of" << item->_file << "to unspecified";
         }
     }
 
@@ -581,7 +578,7 @@ void BulkPropagatorJob::slotPollFinished(UploadFileInfo fileToUpload)
     finalize(job->_item, fileToUpload);
 }
 
-QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item)
+QMap<QByteArray, QByteArray> BulkPropagatorJob::headers(SyncFileItemPtr item) const
 {
     QMap<QByteArray, QByteArray> headers;
     headers[QByteArrayLiteral("Content-Type")] = QByteArrayLiteral("application/octet-stream");
@@ -638,7 +635,7 @@ void BulkPropagatorJob::abortWithError(SyncFileItemPtr item,
     done(item, status, error);
 }
 
-void BulkPropagatorJob::checkResettingErrors(SyncFileItemPtr item)
+void BulkPropagatorJob::checkResettingErrors(SyncFileItemPtr item) const
 {
     if (item->_httpErrorCode == 412
         || propagator()->account()->capabilities().httpErrorCodesThatResetFailingChunkedUploads().contains(item->_httpErrorCode)) {

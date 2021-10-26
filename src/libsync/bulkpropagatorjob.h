@@ -82,7 +82,7 @@ private slots:
     void slotPutFinished(SyncFileItemPtr item,
                          UploadFileInfo fileToUpload);
 
-    void slotUploadProgress(qint64, qint64);
+    void slotUploadProgress(qint64, qint64) const;
 
     void slotJobDestroyed(QObject *job);
 
@@ -95,7 +95,7 @@ private:
                        QByteArray transmissionChecksumHeader);
 
     void adjustLastJobTimeout(AbstractNetworkJob *job,
-                              qint64 fileSize);
+                              qint64 fileSize) const;
 
     void finalize(SyncFileItemPtr item,
                   UploadFileInfo fileToUpload);
@@ -109,7 +109,7 @@ private:
                       const QString &path);
 
     /** Bases headers that need to be sent on the PUT, or in the MOVE for chunking-ng */
-    QMap<QByteArray, QByteArray> headers(SyncFileItemPtr item);
+    QMap<QByteArray, QByteArray> headers(SyncFileItemPtr item) const;
 
     void abortWithError(SyncFileItemPtr item,
                         SyncFileItem::Status status,
@@ -120,7 +120,7 @@ private:
      * transfer if it happens too often. If so: Bump UploadInfo::errorCount
      * and maybe perform the reset.
      */
-    void checkResettingErrors(SyncFileItemPtr item);
+    void checkResettingErrors(SyncFileItemPtr item) const;
 
     /**
      * Error handling functionality that is shared between jobs.

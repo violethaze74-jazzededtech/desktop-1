@@ -42,14 +42,6 @@ class OWNCLOUDSYNC_EXPORT PutMultiFileJob : public AbstractNetworkJob
 {
     Q_OBJECT
 
-private:
-    QHttpMultiPart _body;
-    QIODevice *_device;
-    QMap<QByteArray, QByteArray> _headers;
-    QString _errorString;
-    QUrl _url;
-    QElapsedTimer _requestTimer;
-
 public:
     // Takes ownership of the device
     explicit PutMultiFileJob(AccountPtr account, const QString &path, std::unique_ptr<QIODevice> device,
@@ -75,8 +67,6 @@ public:
     }
     ~PutMultiFileJob() override;
 
-    int _chunk;
-
     void start() override;
 
     bool finished() override;
@@ -99,6 +89,15 @@ public:
 signals:
     void finishedSignal();
     void uploadProgress(qint64, qint64);
+
+private:
+    QHttpMultiPart _body;
+    QIODevice *_device;
+    QMap<QByteArray, QByteArray> _headers;
+    QString _errorString;
+    QUrl _url;
+    QElapsedTimer _requestTimer;
+    int _chunk;
 
 };
 
