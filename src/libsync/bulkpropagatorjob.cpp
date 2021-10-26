@@ -360,7 +360,7 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
 
     slotJobDestroyed(job); // remove it from the _jobs list
 
-    item->_httpErrorCode = job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    item->_httpErrorCode = static_cast<quint16>(job->reply()->attribute(QNetworkRequest::HttpStatusCodeAttribute).toUInt());
     item->_responseTimeStamp = job->responseTimestamp();
     item->_requestId = job->requestId();
     QNetworkReply::NetworkError err = job->reply()->error();
@@ -456,7 +456,7 @@ void BulkPropagatorJob::adjustLastJobTimeout(AbstractNetworkJob *job, qint64 fil
     job->setTimeout(qBound(
         job->timeoutMsec(),
         // Calculate 3 minutes for each gigabyte of data
-        qRound64(threeMinutes * fileSize / 1e9),
+        qRound64(threeMinutes * static_cast<double>(fileSize) / 1e9),
         // Maximum of 30 minutes
                         static_cast<qint64>(30 * 60 * 1000)));
 }
@@ -763,7 +763,7 @@ void BulkPropagatorJob::handleFileRestoration(SyncFileItemPtr item,
     }
 }
 
-void BulkPropagatorJob::handleBlackList(SyncFileItemPtr item)
+void BulkPropagatorJob::handleBlackList(SyncFileItemPtr item) const
 {
     switch (item->_status) {
     case SyncFileItem::SoftError:

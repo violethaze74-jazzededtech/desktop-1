@@ -143,7 +143,7 @@ private:
     void handleFileRestoration(SyncFileItemPtr item,
                                const QString &errorString) const;
 
-    void handleBlackList(SyncFileItemPtr item);
+    void handleBlackList(SyncFileItemPtr item) const;
 
     void handleJobDoneErrors(SyncFileItemPtr item,
                              SyncFileItem::Status status);
