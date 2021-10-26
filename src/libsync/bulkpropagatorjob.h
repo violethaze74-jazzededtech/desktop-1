@@ -129,6 +129,17 @@ private:
                              UploadFileInfo fileToUpload,
                              AbstractNetworkJob *job);
 
+    bool checkFileStillExists(SyncFileItemPtr item,
+                              const bool finished,
+                              const QString &fullFilePath);
+
+    bool checkFileChanged(SyncFileItemPtr item,
+                          const bool finished,
+                          const QString &fullFilePath);
+
+    void computeFileId(SyncFileItemPtr item,
+                       const QJsonObject &fileReply) const;
+
     std::deque<SyncFileItemPtr> _items;
 
     QVector<AbstractNetworkJob *> _jobs; /// network jobs that are currently in transit

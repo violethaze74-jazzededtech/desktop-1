@@ -412,36 +412,20 @@ void BulkPropagatorJob::slotPutFinished(SyncFileItemPtr item,
     QByteArray etag = getEtagFromJsonReply(fileReply);
     finished = etag.length() > 0;
 
-    // Check if the file still exists
     const QString fullFilePath(propagator()->fullLocalPath(item->_file));
-    if (!FileSystem::fileExists(fullFilePath)) {
-        if (!finished) {
-            abortWithError(item, SyncFileItem::SoftError, tr("The local file was removed during sync."));
-            return;
-        } else {
-            propagator()->_anotherSyncNeeded = true;
-        }
+
+    // Check if the file still exists
+    if (!checkFileStillExists(item, finished, fullFilePath)) {
+        return;
     }
 
     // Check whether the file changed since discovery. the file check here is the original and not the temprary.
-    if (!FileSystem::verifyFileUnchanged(fullFilePath, item->_size, item->_modtime)) {
-        propagator()->_anotherSyncNeeded = true;
-        if (!finished) {
-            abortWithError(item, SyncFileItem::SoftError, tr("Local file changed during sync."));
-            // FIXME:  the legacy code was retrying for a few seconds.
-            //         and also checking that after the last chunk, and removed the file in case of INSTRUCTION_NEW
-            return;
-        }
+    if (!checkFileChanged(item, finished, fullFilePath)) {
+        return;
     }
 
     // the file id should only be empty for new files up- or downloaded
-    QByteArray fid = getHeaderFromJsonReply(fileReply, "OC-FileID");
-    if (!fid.isEmpty()) {
-        if (!item->_fileId.isEmpty() && item->_fileId != fid) {
-            qCWarning(lcBulkPropagatorJob) << "File ID changed!" << item->_fileId << fid;
-        }
-        item->_fileId = fid;
-    }
+    computeFileId(item, fileReply);
 
     item->_etag = etag;
 
@@ -788,6 +772,51 @@ void BulkPropagatorJob::commonErrorHandling(SyncFileItemPtr item,
     }
 
     abortWithError(item, status, errorString);
+}
+
+bool BulkPropagatorJob::checkFileStillExists(SyncFileItemPtr item,
+                                             const bool finished,
+                                             const QString &fullFilePath)
+{
+    if (!FileSystem::fileExists(fullFilePath)) {
+        if (!finished) {
+            abortWithError(item, SyncFileItem::SoftError, tr("The local file was removed during sync."));
+            return false;
+        } else {
+            propagator()->_anotherSyncNeeded = true;
+        }
+    }
+
+    return true;
+}
+
+bool BulkPropagatorJob::checkFileChanged(SyncFileItemPtr item,
+                                         const bool finished,
+                                         const QString &fullFilePath)
+{
+    if (!FileSystem::verifyFileUnchanged(fullFilePath, item->_size, item->_modtime)) {
+        propagator()->_anotherSyncNeeded = true;
+        if (!finished) {
+            abortWithError(item, SyncFileItem::SoftError, tr("Local file changed during sync."));
+            // FIXME:  the legacy code was retrying for a few seconds.
+            //         and also checking that after the last chunk, and removed the file in case of INSTRUCTION_NEW
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void BulkPropagatorJob::computeFileId(SyncFileItemPtr item,
+                                      const QJsonObject &fileReply) const
+{
+    QByteArray fid = getHeaderFromJsonReply(fileReply, "OC-FileID");
+    if (!fid.isEmpty()) {
+        if (!item->_fileId.isEmpty() && item->_fileId != fid) {
+            qCWarning(lcBulkPropagatorJob) << "File ID changed!" << item->_fileId << fid;
+        }
+        item->_fileId = fid;
+    }
 }
 
 }
