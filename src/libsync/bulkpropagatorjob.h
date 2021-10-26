@@ -140,6 +140,14 @@ private:
     void computeFileId(SyncFileItemPtr item,
                        const QJsonObject &fileReply) const;
 
+    void handleFileRestoration(SyncFileItemPtr item,
+                               const QString &errorString) const;
+
+    void handleBlackList(SyncFileItemPtr item);
+
+    void handleJobDoneErrors(SyncFileItemPtr item,
+                             SyncFileItem::Status status);
+
     std::deque<SyncFileItemPtr> _items;
 
     QVector<AbstractNetworkJob *> _jobs; /// network jobs that are currently in transit

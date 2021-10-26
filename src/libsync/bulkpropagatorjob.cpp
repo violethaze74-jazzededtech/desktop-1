@@ -510,18 +510,7 @@ void BulkPropagatorJob::done(SyncFileItemPtr item,
 
     qCInfo(lcBulkPropagatorJob) << "Item completed" << item->destination() << item->_status << item->_instruction << item->_errorString;
 
-    if (item->_isRestoration) {
-        if (item->_status == SyncFileItem::Success
-            || item->_status == SyncFileItem::Conflict) {
-            item->_status = SyncFileItem::Restoration;
-        } else {
-            item->_errorString += tr("; Restoration Failed: %1").arg(errorString);
-        }
-    } else {
-        if (item->_errorString.isEmpty()) {
-            item->_errorString = errorString;
-        }
-    }
+    handleFileRestoration(item, errorString);
 
     if (propagator()->_abortRequested && (item->_status == SyncFileItem::NormalError
                                           || item->_status == SyncFileItem::FatalError)) {
@@ -530,70 +519,11 @@ void BulkPropagatorJob::done(SyncFileItemPtr item,
     }
 
     // Blacklist handling
-    switch (item->_status) {
-    case SyncFileItem::SoftError:
-    case SyncFileItem::FatalError:
-    case SyncFileItem::NormalError:
-    case SyncFileItem::DetailError:
-        // Check the blacklist, possibly adjusting the item (including its status)
-        blacklistUpdate(propagator()->_journal, *item);
-        break;
-    case SyncFileItem::Success:
-    case SyncFileItem::Restoration:
-        if (item->_hasBlacklistEntry) {
-            // wipe blacklist entry.
-            propagator()->_journal->wipeErrorBlacklistEntry(item->_file);
-            // remove a blacklist entry in case the file was moved.
-            if (item->_originalFile != item->_file) {
-                propagator()->_journal->wipeErrorBlacklistEntry(item->_originalFile);
-            }
-        }
-        break;
-    case SyncFileItem::Conflict:
-    case SyncFileItem::FileIgnored:
-    case SyncFileItem::NoStatus:
-    case SyncFileItem::BlacklistedError:
-    case SyncFileItem::FileLocked:
-    case SyncFileItem::FileNameInvalid:
-        // nothing
-        break;
-    }
+    handleBlackList(item);
 
-    if (item->hasErrorStatus()) {
-        qCWarning(lcPropagator) << "Could not complete propagation of" << item->destination() << "by" << this << "with status" << item->_status << "and error:" << item->_errorString;
-    } else {
-        qCInfo(lcPropagator) << "Completed propagation of" << item->destination() << "by" << this << "with status" << item->_status;
-    }
-
-    if (item->_status == SyncFileItem::FatalError) {
-        // Abort all remaining jobs.
-        propagator()->abort();
-    }
+    handleJobDoneErrors(item, status);
 
     emit propagator()->itemCompleted(item);
-
-    switch (item->_status)
-    {
-    case SyncFileItem::BlacklistedError:
-    case SyncFileItem::Conflict:
-    case SyncFileItem::FatalError:
-    case SyncFileItem::FileIgnored:
-    case SyncFileItem::FileLocked:
-    case SyncFileItem::FileNameInvalid:
-    case SyncFileItem::NoStatus:
-    case SyncFileItem::NormalError:
-    case SyncFileItem::Restoration:
-    case SyncFileItem::SoftError:
-        _finalStatus = SyncFileItem::NormalError;
-        qCInfo(lcBulkPropagatorJob) << "modify final status NormalError" << _finalStatus << status;
-        break;
-    case SyncFileItem::DetailError:
-        _finalStatus = SyncFileItem::DetailError;
-        qCInfo(lcBulkPropagatorJob) << "modify final status DetailError" << _finalStatus << status;
-        break;
-    case SyncFileItem::Success:
-        break;
-    }
 
     if (_items.empty()) {
         if (!_jobs.empty()) {
@@ -816,6 +746,93 @@ void BulkPropagatorJob::computeFileId(SyncFileItemPtr item,
             qCWarning(lcBulkPropagatorJob) << "File ID changed!" << item->_fileId << fid;
         }
         item->_fileId = fid;
+    }
+}
+
+void BulkPropagatorJob::handleFileRestoration(SyncFileItemPtr item,
+                                              const QString &errorString) const
+{
+    if (item->_isRestoration) {
+        if (item->_status == SyncFileItem::Success
+            || item->_status == SyncFileItem::Conflict) {
+            item->_status = SyncFileItem::Restoration;
+        } else {
+            item->_errorString += tr("; Restoration Failed: %1").arg(errorString);
+        }
+    } else {
+        if (item->_errorString.isEmpty()) {
+            item->_errorString = errorString;
+        }
+    }
+}
+
+void BulkPropagatorJob::handleBlackList(SyncFileItemPtr item)
+{
+    switch (item->_status) {
+    case SyncFileItem::SoftError:
+    case SyncFileItem::FatalError:
+    case SyncFileItem::NormalError:
+    case SyncFileItem::DetailError:
+        // Check the blacklist, possibly adjusting the item (including its status)
+        blacklistUpdate(propagator()->_journal, *item);
+        break;
+    case SyncFileItem::Success:
+    case SyncFileItem::Restoration:
+        if (item->_hasBlacklistEntry) {
+            // wipe blacklist entry.
+            propagator()->_journal->wipeErrorBlacklistEntry(item->_file);
+            // remove a blacklist entry in case the file was moved.
+            if (item->_originalFile != item->_file) {
+                propagator()->_journal->wipeErrorBlacklistEntry(item->_originalFile);
+            }
+        }
+        break;
+    case SyncFileItem::Conflict:
+    case SyncFileItem::FileIgnored:
+    case SyncFileItem::NoStatus:
+    case SyncFileItem::BlacklistedError:
+    case SyncFileItem::FileLocked:
+    case SyncFileItem::FileNameInvalid:
+        // nothing
+        break;
+    }
+}
+
+void BulkPropagatorJob::handleJobDoneErrors(SyncFileItemPtr item,
+                                            SyncFileItem::Status status)
+{
+    if (item->hasErrorStatus()) {
+        qCWarning(lcPropagator) << "Could not complete propagation of" << item->destination() << "by" << this << "with status" << item->_status << "and error:" << item->_errorString;
+    } else {
+        qCInfo(lcPropagator) << "Completed propagation of" << item->destination() << "by" << this << "with status" << item->_status;
+    }
+
+    if (item->_status == SyncFileItem::FatalError) {
+        // Abort all remaining jobs.
+        propagator()->abort();
+    }
+
+    switch (item->_status)
+    {
+    case SyncFileItem::BlacklistedError:
+    case SyncFileItem::Conflict:
+    case SyncFileItem::FatalError:
+    case SyncFileItem::FileIgnored:
+    case SyncFileItem::FileLocked:
+    case SyncFileItem::FileNameInvalid:
+    case SyncFileItem::NoStatus:
+    case SyncFileItem::NormalError:
+    case SyncFileItem::Restoration:
+    case SyncFileItem::SoftError:
+        _finalStatus = SyncFileItem::NormalError;
+        qCInfo(lcBulkPropagatorJob) << "modify final status NormalError" << _finalStatus << status;
+        break;
+    case SyncFileItem::DetailError:
+        _finalStatus = SyncFileItem::DetailError;
+        qCInfo(lcBulkPropagatorJob) << "modify final status DetailError" << _finalStatus << status;
+        break;
+    case SyncFileItem::Success:
+        break;
     }
 }
 
