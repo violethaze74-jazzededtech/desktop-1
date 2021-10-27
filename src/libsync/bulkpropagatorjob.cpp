@@ -242,7 +242,8 @@ void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
     // Should I compute the checksum of the original (item->_file)
     // or the maybe-modified? (fileToUpload._file) ?
 
-    QByteArray existingChecksumType, existingChecksum;
+    QByteArray existingChecksumType;
+    QByteArray existingChecksum;
     parseChecksumHeader(item->_checksumHeader, &existingChecksumType, &existingChecksum);
     if (existingChecksumType == checksumType) {
         slotComputeTransmissionChecksum(item, fileToUpload, checksumType, existingChecksum);
@@ -566,7 +567,7 @@ void BulkPropagatorJob::startPollJob(SyncFileItemPtr item,
 void BulkPropagatorJob::slotPollFinished(UploadFileInfo fileToUpload)
 {
     auto *job = qobject_cast<PollJob *>(sender());
-    ASSERT(job);
+    ASSERT(job)
 
     slotJobDestroyed(job);
 
