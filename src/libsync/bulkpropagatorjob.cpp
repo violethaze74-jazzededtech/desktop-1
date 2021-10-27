@@ -214,9 +214,9 @@ void BulkPropagatorJob::doStartUpload(SyncFileItemPtr item,
     connect(job.get(), &PutMultiFileJob::uploadProgress, devicePtr, &UploadDevice::slotJobUploadProgress);
     connect(job.get(), &QObject::destroyed, this, &BulkPropagatorJob::slotJobDestroyed);
     adjustLastJobTimeout(job.get(), fileSize);
-    _jobs.append(job.get());
-    job->start();
-    job.release();
+    auto jobCopy = job.get();
+    _jobs.append(job.release());
+    jobCopy->start();
 }
 
 void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
@@ -260,8 +260,7 @@ void BulkPropagatorJob::slotComputeContentChecksum(SyncFileItemPtr item,
     });
     connect(computeChecksum.get(), &ComputeChecksum::done,
             computeChecksum.get(), &QObject::deleteLater);
-    computeChecksum->start(fileToUpload._path);
-    computeChecksum.release();
+    computeChecksum.release()->start(fileToUpload._path);
 }
 
 void BulkPropagatorJob::slotComputeTransmissionChecksum(SyncFileItemPtr item,
@@ -293,8 +292,7 @@ void BulkPropagatorJob::slotComputeTransmissionChecksum(SyncFileItemPtr item,
     });
     connect(computeChecksum.get(), &ComputeChecksum::done,
             computeChecksum.get(), &QObject::deleteLater);
-    computeChecksum->start(fileToUpload._path);
-    computeChecksum.release();
+    computeChecksum.release()->start(fileToUpload._path);
 }
 
 void BulkPropagatorJob::slotStartUpload(SyncFileItemPtr item,
@@ -556,9 +554,9 @@ void BulkPropagatorJob::startPollJob(SyncFileItemPtr item,
     info._fileSize = item->_size;
     propagator()->_journal->setPollInfo(info);
     propagator()->_journal->commit("add poll info");
-    _jobs.append(job.get());
-    job->start();
-    job.release();
+    auto jobCopy = job.get();
+    _jobs.append(job.release());
+    jobCopy->start();
     if (!_items.empty()) {
         scheduleSelfOrChild();
     }
