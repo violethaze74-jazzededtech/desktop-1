@@ -132,6 +132,11 @@ void Flow2Auth::fetchNewToken(const TokenAction action)
 
 
         _loginUrl = loginUrl;
+#ifdef Q_OS_WIN
+        if (Theme::instance()->loginWithSystemUserName()) {
+            _loginUrl.addQueryItem(QStringLiteral("user"), Utility::getCurrentUserName());
+        }
+#endif
         _pollToken = pollToken;
         _pollEndpoint = pollEndpoint;
 

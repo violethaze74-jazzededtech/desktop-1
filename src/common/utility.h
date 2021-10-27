@@ -257,6 +257,8 @@ namespace Utility {
 
     OCSYNC_EXPORT QString formatWinError(long error);
 
+    OCSYNC_EXPORT QString getCurrentUserName();
+
     class OCSYNC_EXPORT NtfsPermissionLookupRAII
     {
     public:
