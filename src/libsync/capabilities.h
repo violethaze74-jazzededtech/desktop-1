@@ -59,6 +59,7 @@ public:
     bool shareResharing() const;
     int shareDefaultPermissions() const;
     bool chunkingNg() const;
+    bool bulkUpload() const;
     bool userStatusNotification() const;
     bool userStatus() const;
     bool userStatusSupportsEmoji() const;
